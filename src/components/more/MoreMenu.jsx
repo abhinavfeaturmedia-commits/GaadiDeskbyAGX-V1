@@ -70,10 +70,10 @@ export const MoreMenu = () => {
 
   if (activeSubView === 'papers') {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 animate-fade-in">
         <button
           onClick={() => handleSubViewChange(null)}
-          className="text-xs font-black text-[#111827] hover:underline flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-[#E5DFD3] shadow-xs"
+          className="text-xs font-black text-[#111827] hover:underline flex items-center gap-1 bg-white px-3 py-1.5 rounded-full border-2 border-[#E5DFD3] shadow-xs tap-active"
         >
           ← Back to More Menu
         </button>
@@ -84,14 +84,247 @@ export const MoreMenu = () => {
 
   if (activeSubView === 'crm') {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 animate-fade-in">
         <button
           onClick={() => handleSubViewChange(null)}
-          className="text-xs font-black text-[#111827] hover:underline flex items-center gap-1 bg-white px-3 py-1 rounded-full border border-[#E5DFD3] shadow-xs"
+          className="text-xs font-black text-[#111827] hover:underline flex items-center gap-1 bg-white px-3 py-1.5 rounded-full border-2 border-[#E5DFD3] shadow-xs tap-active"
         >
           ← Back to More Menu
         </button>
         <CustomerDriverCRM />
+      </div>
+    );
+  }
+
+  if (activeSubView === 'ratecards') {
+    return (
+      <div className="space-y-4 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => handleSubViewChange(null)}
+            className="text-xs font-black text-[#111827] hover:underline flex items-center gap-1 bg-white px-3 py-1.5 rounded-full border-2 border-[#E5DFD3] shadow-xs tap-active"
+          >
+            ← Back to More Menu
+          </button>
+          <span className="text-xs font-black text-[#4B5563] uppercase tracking-wider">Fare Engine</span>
+        </div>
+
+        <div className="bg-white rounded-3xl p-5 border-2 border-[#E5DFD3] shadow-xs space-y-4">
+          <div>
+            <h3 className="text-base font-black text-[#111827]">
+              Manage Fare Rate Cards
+            </h3>
+            <p className="text-xs text-[#4B5563] font-semibold mt-0.5">
+              Rates automatically pre-fill into new booking calculations based on trip type & car category.
+            </p>
+          </div>
+
+          <div className="space-y-2.5">
+            {rateCards.map(rc => (
+              <div
+                key={rc.id}
+                className="p-3.5 bg-[#F8F6F0] rounded-2xl border border-[#E5DFD3] flex items-center justify-between text-xs"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-black text-[#111827]">{rc.tripType} - {rc.category || 'All Categories'}</h4>
+                    <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full border border-amber-300">
+                      {rc.category || 'Standard'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#4B5563] font-semibold mt-1">
+                    {rc.tripType === 'Outstation' 
+                      ? `₹${rc.perKmRate}/km • Min ${rc.minKmPerDay} km/day • Bata ₹${rc.driverBata}`
+                      : rc.tripType === 'Rental'
+                      ? `₹${rc.basePrice}/day (Deposit ₹${rc.securityDeposit} • ${rc.fuelPolicy})`
+                      : `Base ₹${rc.basePrice} (${rc.includedHours}h / ${rc.includedKm}km) • Extra ₹${rc.extraKmRate}/km`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setEditingRateCard(rc)}
+                  className="px-3.5 py-1.5 rounded-full bg-[#111827] text-white text-[11px] font-black hover:bg-black tap-active shadow-xs"
+                >
+                  Edit Rates
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {editingRateCard && (
+            <form onSubmit={handleRateCardSave} className="p-4 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-3 mt-4 animate-fade-in">
+              <h4 className="text-xs font-black text-amber-950 uppercase tracking-wider">
+                Editing {editingRateCard.tripType} ({editingRateCard.category || 'Standard'}) Rates
+              </h4>
+              {editingRateCard.tripType === 'Outstation' ? (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-900 block mb-1">Rate / KM (₹)</label>
+                    <input
+                      type="number"
+                      value={editingRateCard.perKmRate}
+                      onChange={e => setEditingRateCard({ ...editingRateCard, perKmRate: Number(e.target.value) })}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-900 block mb-1">Driver Bata (₹/day)</label>
+                    <input
+                      type="number"
+                      value={editingRateCard.driverBata}
+                      onChange={e => setEditingRateCard({ ...editingRateCard, driverBata: Number(e.target.value) })}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-950"
+                    />
+                  </div>
+                </div>
+              ) : editingRateCard.tripType === 'Rental' ? (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-900 block mb-1">Daily Rental Price (₹)</label>
+                    <input
+                      type="number"
+                      value={editingRateCard.basePrice}
+                      onChange={e => setEditingRateCard({ ...editingRateCard, basePrice: Number(e.target.value) })}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-900 block mb-1">Security Deposit (₹)</label>
+                    <input
+                      type="number"
+                      value={editingRateCard.securityDeposit}
+                      onChange={e => setEditingRateCard({ ...editingRateCard, securityDeposit: Number(e.target.value) })}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-950"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-900 block mb-1">Base Package Fare (₹)</label>
+                    <input
+                      type="number"
+                      value={editingRateCard.basePrice}
+                      onChange={e => setEditingRateCard({ ...editingRateCard, basePrice: Number(e.target.value) })}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-900 block mb-1">Extra KM Rate (₹)</label>
+                    <input
+                      type="number"
+                      value={editingRateCard.extraKmRate}
+                      onChange={e => setEditingRateCard({ ...editingRateCard, extraKmRate: Number(e.target.value) })}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-amber-950"
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingRateCard(null)}
+                  className="flex-1 py-2 text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-full"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 text-xs font-black text-white bg-[#111827] rounded-full shadow-xs"
+                >
+                  Save Rate Card
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (activeSubView === 'business') {
+    return (
+      <div className="space-y-4 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => handleSubViewChange(null)}
+            className="text-xs font-black text-[#111827] hover:underline flex items-center gap-1 bg-white px-3 py-1.5 rounded-full border-2 border-[#E5DFD3] shadow-xs tap-active"
+          >
+            ← Back to More Menu
+          </button>
+          <span className="text-xs font-black text-[#4B5563] uppercase tracking-wider">Agency Profile</span>
+        </div>
+
+        <div className="bg-white rounded-3xl p-5 border-2 border-[#E5DFD3] shadow-xs space-y-4">
+          <div>
+            <h3 className="text-base font-black text-[#111827]">
+              Agency Profile & Invoicing Details
+            </h3>
+            <p className="text-xs text-[#4B5563] font-semibold mt-0.5">
+              These details print directly on all your GST Invoices, WhatsApp bills, and duty slips.
+            </p>
+          </div>
+
+          <form onSubmit={handleBizSave} className="space-y-3.5">
+            <div>
+              <label className="text-[11px] font-bold text-[#111827] block mb-1">Business / Agency Name</label>
+              <input
+                type="text"
+                value={bizForm.name}
+                onChange={e => setBizForm(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-[11px] font-bold text-[#111827] block mb-1">Owner Name</label>
+                <input
+                  type="text"
+                  value={bizForm.ownerName}
+                  onChange={e => setBizForm(prev => ({ ...prev, ownerName: e.target.value }))}
+                  className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-[#111827] block mb-1">City / Base Hub</label>
+                <input
+                  type="text"
+                  value={bizForm.city}
+                  onChange={e => setBizForm(prev => ({ ...prev, city: e.target.value }))}
+                  className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-[#111827] block mb-1">GSTIN Number</label>
+              <input
+                type="text"
+                value={bizForm.gstin}
+                onChange={e => setBizForm(prev => ({ ...prev, gstin: e.target.value }))}
+                className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-mono font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-[#111827] block mb-1">UPI ID for Direct Payments</label>
+              <input
+                type="text"
+                value={bizForm.upiId}
+                onChange={e => setBizForm(prev => ({ ...prev, upiId: e.target.value }))}
+                className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-mono font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 rounded-full bg-[#111827] text-white text-xs font-black shadow-md hover:bg-black tap-active mt-2"
+            >
+              Save Agency Profile
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
@@ -272,185 +505,6 @@ export const MoreMenu = () => {
           The Indian Fleet Operating System • Built with ❤️ for Cab & Tour Operators
         </p>
       </div>
-      {activeSubView === 'ratecards' && (
-        <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs space-y-3">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xs font-black text-[#111827] uppercase tracking-wider">
-              Manage Fare Rate Cards
-            </h3>
-            <button
-              onClick={() => handleSubViewChange(null)}
-              className="text-xs font-bold text-[#4B5563] hover:text-[#111827]"
-            >
-              Close
-            </button>
-          </div>
-
-          <div className="space-y-2.5">
-            {rateCards.map(rc => (
-              <div
-                key={rc.id}
-                className="p-3 bg-[#F8F6F0] rounded-2xl border border-[#E5DFD3] flex items-center justify-between text-xs"
-              >
-                <div>
-                  <h4 className="font-black text-[#111827]">{rc.tripType} Package</h4>
-                  <p className="text-[10px] text-[#4B5563] font-semibold">
-                    {rc.tripType === 'Outstation' ? `₹${rc.perKmRate}/km • Min ${rc.minKmPerDay} km/day` : `Base ₹${rc.basePrice} (${rc.includedHours}h / ${rc.includedKm}km)`}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setEditingRateCard(rc)}
-                  className="px-3 py-1 rounded-full bg-[#111827] text-white text-[10px] font-black hover:bg-black tap-active"
-                >
-                  Edit Rates
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {editingRateCard && (
-            <form onSubmit={handleRateCardSave} className="p-3 bg-amber-50 rounded-2xl border border-amber-200 space-y-2 mt-3">
-              <h4 className="text-xs font-black text-amber-950">Editing {editingRateCard.tripType} Rates</h4>
-              {editingRateCard.tripType === 'Outstation' ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-amber-900 block">Rate / KM (₹)</label>
-                    <input
-                      type="number"
-                      value={editingRateCard.perKmRate}
-                      onChange={e => setEditingRateCard({ ...editingRateCard, perKmRate: Number(e.target.value) })}
-                      className="w-full bg-white border border-amber-300 rounded-xl px-2 py-1 text-xs font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-amber-900 block">Driver Bata (₹/day)</label>
-                    <input
-                      type="number"
-                      value={editingRateCard.driverBata}
-                      onChange={e => setEditingRateCard({ ...editingRateCard, driverBata: Number(e.target.value) })}
-                      className="w-full bg-white border border-amber-300 rounded-xl px-2 py-1 text-xs font-bold"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-amber-900 block">Base Package (₹)</label>
-                    <input
-                      type="number"
-                      value={editingRateCard.basePrice}
-                      onChange={e => setEditingRateCard({ ...editingRateCard, basePrice: Number(e.target.value) })}
-                      className="w-full bg-white border border-amber-300 rounded-xl px-2 py-1 text-xs font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-amber-900 block">Extra KM Rate (₹)</label>
-                    <input
-                      type="number"
-                      value={editingRateCard.extraKmRate}
-                      onChange={e => setEditingRateCard({ ...editingRateCard, extraKmRate: Number(e.target.value) })}
-                      className="w-full bg-white border border-amber-300 rounded-xl px-2 py-1 text-xs font-bold"
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setEditingRateCard(null)}
-                  className="flex-1 py-1 text-xs font-bold text-gray-700 bg-white border border-gray-200 rounded-full"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-1 text-xs font-black text-white bg-[#111827] rounded-full"
-                >
-                  Save Rates
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-
-      {/* BUSINESS SETTINGS SUB-VIEW */}
-      {activeSubView === 'business' && (
-        <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs space-y-3">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xs font-black text-[#111827] uppercase tracking-wider">
-              Edit Agency Profile & Billing Info
-            </h3>
-            <button
-              onClick={() => handleSubViewChange(null)}
-              className="text-xs font-bold text-[#4B5563] hover:text-[#111827]"
-            >
-              Close
-            </button>
-          </div>
-
-          <form onSubmit={handleBizSave} className="space-y-3">
-            <div>
-              <label className="text-[11px] font-bold text-[#111827] block mb-1">Business / Agency Name</label>
-              <input
-                type="text"
-                value={bizForm.name}
-                onChange={e => setBizForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[11px] font-bold text-[#111827] block mb-1">Owner Name</label>
-                <input
-                  type="text"
-                  value={bizForm.ownerName}
-                  onChange={e => setBizForm(prev => ({ ...prev, ownerName: e.target.value }))}
-                  className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-[#111827] block mb-1">City / State</label>
-                <input
-                  type="text"
-                  value={bizForm.city}
-                  onChange={e => setBizForm(prev => ({ ...prev, city: e.target.value }))}
-                  className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-[#111827] block mb-1">GSTIN Number</label>
-              <input
-                type="text"
-                value={bizForm.gstin}
-                onChange={e => setBizForm(prev => ({ ...prev, gstin: e.target.value }))}
-                className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-mono font-bold text-[#111827] focus:outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-[#111827] block mb-1">UPI ID for Payments</label>
-              <input
-                type="text"
-                value={bizForm.upiId}
-                onChange={e => setBizForm(prev => ({ ...prev, upiId: e.target.value }))}
-                className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-mono font-bold text-[#111827] focus:outline-none"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-full bg-[#111827] text-white text-xs font-black shadow-md hover:bg-black tap-active"
-            >
-              Save Agency Profile
-            </button>
-          </form>
-        </div>
-      )}
     </div>
   );
 };

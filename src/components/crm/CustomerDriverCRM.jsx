@@ -13,8 +13,12 @@ import {
   CheckCircle2,
   Calendar,
   ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
+import { CustomerDetailModal } from './CustomerDetailModal';
+import { DriverDetailModal } from './DriverDetailModal';
 
 export const CustomerDriverCRM = () => {
   const {
@@ -34,6 +38,10 @@ export const CustomerDriverCRM = () => {
   const [search, setSearch] = useState('');
   const [isAddCustModal, setIsAddCustModal] = useState(false);
   const [isAddDrvModal, setIsAddDrvModal] = useState(false);
+
+  // Selected for detailed profile modal
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [selectedDriver, setSelectedDriver] = useState(null);
 
   // New Customer Form State
   const [newCust, setNewCust] = useState({
@@ -145,17 +153,23 @@ export const CustomerDriverCRM = () => {
           {filteredCustomers.map(cust => (
             <div
               key={cust.id}
-              className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs space-y-3"
+              onClick={() => setSelectedCustomer(cust)}
+              className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] hover:border-[#111827] shadow-xs space-y-3 cursor-pointer transition-all group tap-active"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
-                  <div className="w-9 h-9 rounded-2xl bg-blue-100 text-blue-900 flex items-center justify-center font-black text-xs">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-100 text-blue-900 flex items-center justify-center font-black text-xs group-hover:bg-[#111827] group-hover:text-white transition-colors">
                     {cust.type === 'Corporate' ? <Building className="w-4 h-4" /> : <Users className="w-4 h-4" />}
                   </div>
                   <div>
-                    <h3 className="text-xs font-black text-[#111827]">{cust.name}</h3>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xs font-black text-[#111827] group-hover:text-blue-600 transition-colors">
+                        {cust.name}
+                      </h3>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
+                    </div>
                     <p className="text-[11px] text-[#4B5563] font-semibold">
-                      {cust.phone} • {cust.type}
+                      +91 {cust.phone} • {cust.type}
                     </p>
                   </div>
                 </div>
@@ -169,13 +183,14 @@ export const CustomerDriverCRM = () => {
               </div>
 
               {cust.address && (
-                <p className="text-[11px] text-[#4B5563] bg-[#F8F6F0] p-2 rounded-xl border border-[#E5DFD3]">
-                  📍 {cust.address} {cust.gstin ? `• GSTIN: ${cust.gstin}` : ''}
+                <p className="text-[11px] text-[#4B5563] bg-[#F8F6F0] p-2 rounded-xl border border-[#E5DFD3] flex items-center justify-between">
+                  <span>📍 {cust.address} {cust.gstin ? `• GSTIN: ${cust.gstin}` : ''}</span>
+                  <span className="text-[10px] text-blue-600 font-bold hidden sm:inline">View Trips History →</span>
                 </p>
               )}
 
               {/* Action Buttons */}
-              <div className="flex items-center space-x-2 pt-1 border-t border-gray-100">
+              <div className="flex items-center space-x-2 pt-1 border-t border-gray-100" onClick={e => e.stopPropagation()}>
                 <button
                   onClick={() => openNewBookingWithPrefill({ customerName: cust.name, customerPhone: cust.phone, pickupLocation: cust.address })}
                   className="flex-1 py-1.5 rounded-full bg-[#111827] hover:bg-black text-white text-[11px] font-black flex items-center justify-center gap-1 shadow-xs tap-active"
@@ -213,23 +228,29 @@ export const CustomerDriverCRM = () => {
           {filteredDrivers.map(drv => (
             <div
               key={drv.id}
-              className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs space-y-3"
+              onClick={() => setSelectedDriver(drv)}
+              className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] hover:border-[#111827] shadow-xs space-y-3 cursor-pointer transition-all group tap-active"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2.5">
-                  <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-black text-xs">
+                  <div className="w-9 h-9 rounded-2xl bg-amber-100 text-amber-900 flex items-center justify-center font-black text-xs group-hover:bg-[#111827] group-hover:text-white transition-colors">
                     <UserCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-black text-[#111827]">{drv.name}</h3>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xs font-black text-[#111827] group-hover:text-amber-800 transition-colors">
+                        {drv.name}
+                      </h3>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-800 group-hover:translate-x-0.5 transition-all" />
+                    </div>
                     <p className="text-[11px] text-[#4B5563] font-semibold">
-                      {drv.phone}
+                      +91 {drv.phone}
                     </p>
                   </div>
                 </div>
 
                 <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
-                  drv.status === 'On Trip' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-gray-100 text-gray-800 border-gray-300'
+                  drv.status === 'On Trip' ? 'bg-emerald-50 text-emerald-800 border-emerald-300 animate-pulse' : 'bg-gray-100 text-gray-800 border-gray-300'
                 }`}>
                   {drv.status}
                 </span>
@@ -247,7 +268,7 @@ export const CustomerDriverCRM = () => {
               </div>
 
               {/* Driver Actions */}
-              <div className="flex items-center space-x-2 pt-1 border-t border-gray-100">
+              <div className="flex items-center space-x-2 pt-1 border-t border-gray-100" onClick={e => e.stopPropagation()}>
                 <button
                   onClick={() => setRenewalModalData({ driverId: drv.id, docType: 'Driver License', driverName: drv.name, currentExpiry: drv.dlExpiry })}
                   className="flex-1 py-1.5 rounded-full bg-white border-2 border-[#E5DFD3] text-[#111827] text-[11px] font-black flex items-center justify-center gap-1 hover:bg-gray-50 tap-active shadow-xs"
@@ -267,6 +288,22 @@ export const CustomerDriverCRM = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Customer Detail Dossier Modal */}
+      {selectedCustomer && (
+        <CustomerDetailModal
+          customer={selectedCustomer}
+          onClose={() => setSelectedCustomer(null)}
+        />
+      )}
+
+      {/* Driver Detail Dossier Modal */}
+      {selectedDriver && (
+        <DriverDetailModal
+          driver={selectedDriver}
+          onClose={() => setSelectedDriver(null)}
+        />
       )}
 
       {/* Add Customer Modal */}

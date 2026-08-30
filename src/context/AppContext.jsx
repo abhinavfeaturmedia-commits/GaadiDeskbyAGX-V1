@@ -158,11 +158,12 @@ export const AppProvider = ({ children }) => {
     setIsNewBookingOpen(true);
   };
 
-  // Clash Detection Logic: Checks BOTH Vehicle AND Driver for overlapping bookings
-  const checkBookingClash = (vehicleId, driverId, startDateTime, endDateTime, excludeBookingId = null) => {
+  // Clash Detection Logic: Checks BOTH Vehicle AND Driver for overlapping bookings with adaptive turnaround buffer
+  const checkBookingClash = (vehicleId, driverId, startDateTime, endDateTime, excludeBookingId = null, tripType = 'Outstation') => {
     if (!startDateTime || !endDateTime) return { vehicleConflict: null, driverConflict: null };
 
-    const BUFFER_MS = 60 * 60 * 1000; // 1 Hour turnaround buffer
+    // Adaptive buffer: 30 mins for local/airport, 90 mins for outstation/rental/package
+    const BUFFER_MS = (tripType === 'Local' || tripType === 'Airport') ? 30 * 60 * 1000 : 90 * 60 * 1000;
     const reqStart = new Date(startDateTime).getTime() - BUFFER_MS;
     const reqEnd = new Date(endDateTime).getTime() + BUFFER_MS;
 
@@ -207,6 +208,7 @@ export const AppProvider = ({ children }) => {
         { type: 'PUC', expiry: veh.documents?.pucExpiry },
         { type: 'Fitness', expiry: veh.documents?.fitnessExpiry },
         { type: 'Permit', expiry: veh.documents?.permitExpiry },
+        { type: 'RC Book', expiry: veh.documents?.rcExpiry }
       ];
 
       docs.forEach(doc => {
@@ -274,8 +276,11 @@ export const AppProvider = ({ children }) => {
     return newTx;
   };
 
-  // Add / Edit Booking with Ledger Integration
+  // Add / Edit Booking with Synchronized Ledger & CRM Integration
   const saveBooking = (bookingData) => {
+    const existingIndex = bookingData.id ? bookings.findIndex(b => b.id === bookingData.id) : -1;
+    const existingBooking = existingIndex >= 0 ? bookings[existingIndex] : null;
+
     const newId = bookingData.id || `GD-BK-${String(bookings.length + 101).padStart(3, '0')}`;
     const invoiceNumber = bookingData.invoiceNumber || `GD/2026-27/${String(bookings.length + 101).padStart(4, '0')}`;
 
@@ -287,31 +292,47 @@ export const AppProvider = ({ children }) => {
     };
 
     setBookings(prev => {
-      const idx = prev.findIndex(b => b.id === newId);
-      if (idx >= 0) {
+      if (existingIndex >= 0) {
         const updated = [...prev];
-        updated[idx] = newBooking;
+        updated[existingIndex] = newBooking;
         return updated;
       }
       return [newBooking, ...prev];
     });
 
-    // Record Advance payment transaction if positive
-    if (Number(bookingData.advancePaid) > 0 && !bookingData.id) {
-      recordTransaction({
-        type: 'Income',
-        category: 'Booking Advance',
-        amount: Number(bookingData.advancePaid),
-        paymentMode: bookingData.advanceMode || 'UPI',
-        bookingId: newId,
-        vehicleId: bookingData.vehicleId,
-        vehiclePlate: bookingData.vehiclePlate,
-        customerName: bookingData.customerName,
-        notes: `Advance payment for trip ${bookingData.pickupLocation} -> ${bookingData.dropLocation}`
-      });
+    // Record Advance payment transaction if brand new or if advance was modified
+    if (Number(bookingData.advancePaid) > 0) {
+      if (!existingBooking) {
+        recordTransaction({
+          type: 'Income',
+          category: 'Booking Advance',
+          amount: Number(bookingData.advancePaid),
+          paymentMode: bookingData.advanceMode || 'UPI',
+          bookingId: newId,
+          vehicleId: bookingData.vehicleId,
+          vehiclePlate: bookingData.vehiclePlate,
+          customerName: bookingData.customerName,
+          notes: `Advance for ${bookingData.pickupLocation} -> ${bookingData.dropLocation}`
+        });
+      } else if (Number(existingBooking.advancePaid || 0) !== Number(bookingData.advancePaid)) {
+        const diffAdvance = Number(bookingData.advancePaid) - Number(existingBooking.advancePaid || 0);
+        if (diffAdvance > 0) {
+          recordTransaction({
+            type: 'Income',
+            category: 'Booking Advance Top-up',
+            amount: diffAdvance,
+            paymentMode: bookingData.advanceMode || 'UPI',
+            bookingId: newId,
+            vehicleId: bookingData.vehicleId,
+            vehiclePlate: bookingData.vehiclePlate,
+            customerName: bookingData.customerName,
+            notes: `Additional advance for trip ${newId}`
+          });
+        }
+      }
     }
 
-    // Update Customer details and pending balance
+    // Update Customer details and pending balance delta in CRM
     if (bookingData.customerName) {
       setCustomers(prev => {
         const match = prev.find(c =>
@@ -319,13 +340,18 @@ export const AppProvider = ({ children }) => {
           (bookingData.customerPhone && c.phone === bookingData.customerPhone)
         );
 
+        const oldPending = existingBooking ? Number(existingBooking.balancePending || 0) : 0;
+        const newPending = Number(bookingData.balancePending || 0);
+        const deltaPending = newPending - oldPending;
+
         if (match) {
           return prev.map(c => {
             if (c.id === match.id) {
               return {
                 ...c,
-                totalBookings: (c.totalBookings || 0) + (bookingData.id ? 0 : 1),
-                pendingBalance: (c.pendingBalance || 0) + Number(bookingData.balancePending || 0)
+                totalBookings: (c.totalBookings || 0) + (existingBooking ? 0 : 1),
+                pendingBalance: Math.max(0, (c.pendingBalance || 0) + deltaPending),
+                address: bookingData.pickupLocation || c.address
               };
             }
             return c;
@@ -338,7 +364,7 @@ export const AppProvider = ({ children }) => {
             phone: bookingData.customerPhone || '9876543210',
             type: 'Personal',
             totalBookings: 1,
-            pendingBalance: Number(bookingData.balancePending || 0),
+            pendingBalance: Math.max(0, Number(bookingData.balancePending || 0)),
             address: bookingData.pickupLocation || ''
           };
           return [newCust, ...prev];
@@ -382,12 +408,13 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Complete Trip & Settle Meter Reading & Ledger
+  // Complete Trip & Settle Meter Reading with Zero Double-Counting
   const completeTripAndSettle = (bookingId, settlementData) => {
     const targetBooking = bookings.find(b => b.id === bookingId);
     if (!targetBooking) return;
 
     const {
+      startKm,
       endKm,
       actualKm,
       extraKmCharges,
@@ -400,20 +427,36 @@ export const AppProvider = ({ children }) => {
       balanceRemaining
     } = settlementData;
 
+    // Zero Double-Counting Fare Formula:
+    // Base Fare + Actual Extra KM Charges + Actual Driver Bata - Actual Discount
+    const baseFare = Number(targetBooking.baseFare || 0);
+    const taxableAmount = Math.max(0, baseFare + Number(extraKmCharges || 0) + Number(driverBata || 0) - Number(discount || 0));
+    const gstPercent = targetBooking.gstEnabled ? Number(targetBooking.gstPercent || 5) : 0;
+    const gstAmount = Math.round(taxableAmount * (gstPercent / 100));
+    const totalFare = taxableAmount + gstAmount + Number(tollParking || 0);
+
+    const prevAdvance = Number(targetBooking.advancePaid || 0);
+    const finalPaid = Number(finalPaidAmount || 0);
+    const totalCollected = prevAdvance + finalPaid;
+    const finalBalancePending = Math.max(0, totalFare - totalCollected);
+
     // 1. Update Booking
     const updatedBooking = {
       ...targetBooking,
       status: 'Completed',
       actualEndDateTime: new Date().toISOString(),
+      startKm: Number(startKm || targetBooking.startKm || 0),
       endKm: Number(endKm || 0),
       actualKm: Number(actualKm || 0),
       extraKmCharges: Number(extraKmCharges || 0),
-      tollParking: Number(tollParking || 0),
       driverBata: Number(driverBata || targetBooking.driverBata || 0),
+      tollParking: Number(tollParking || 0),
       discount: Number(discount || 0),
-      totalFare: Number(targetBooking.totalFare || 0) + Number(extraKmCharges || 0) + Number(tollParking || 0) - Number(discount || 0),
-      advancePaid: Number(targetBooking.advancePaid || 0) + Number(finalPaidAmount || 0),
-      balancePending: Number(balanceRemaining || 0),
+      taxableAmount,
+      gstAmount,
+      totalFare,
+      advancePaid: totalCollected,
+      balancePending: finalBalancePending,
       settledAt: new Date().toISOString(),
       settlementMode: settlementPaymentMode
     };
@@ -440,11 +483,11 @@ export const AppProvider = ({ children }) => {
     }
 
     // 4. Record Settlement Payment in Transaction Ledger
-    if (Number(finalPaidAmount) > 0) {
+    if (finalPaid > 0) {
       recordTransaction({
         type: 'Income',
         category: 'Trip Final Settlement',
-        amount: Number(finalPaidAmount),
+        amount: finalPaid,
         paymentMode: settlementPaymentMode || 'Cash',
         bookingId: targetBooking.id,
         vehicleId: targetBooking.vehicleId,
@@ -454,12 +497,15 @@ export const AppProvider = ({ children }) => {
       });
     }
 
-    // 5. Update Customer Pending Balance in CRM
+    // 5. Update Customer Pending Balance in CRM (Deduct old pending, add actual remaining)
+    const prevBookingPending = Number(targetBooking.balancePending || 0);
+    const balanceDelta = finalBalancePending - prevBookingPending;
+
     setCustomers(prev => prev.map(c => {
       if (c.name.toLowerCase() === targetBooking.customerName.toLowerCase() || c.phone === targetBooking.customerPhone) {
         return {
           ...c,
-          pendingBalance: Math.max(0, Number(balanceRemaining || 0))
+          pendingBalance: Math.max(0, (c.pendingBalance || 0) + balanceDelta)
         };
       }
       return c;
@@ -468,32 +514,70 @@ export const AppProvider = ({ children }) => {
     return updatedBooking;
   };
 
-  // Update Trip Status Lifecycle
+  // Update Trip Status Lifecycle & Handle Trip Cancellations Cleanly
   const updateBookingStatus = (bookingId, newStatus, extraData = {}) => {
+    const targetBooking = bookings.find(b => b.id === bookingId);
+    if (!targetBooking) return;
+
     setBookings(prev => {
       return prev.map(b => {
         if (b.id !== bookingId) return b;
-        const updated = { ...b, status: newStatus, ...extraData };
-
-        if (newStatus === 'Completed' || newStatus === 'Cancelled') {
-          if (b.vehicleId) {
-            setVehicles(vPrev => vPrev.map(v => v.id === b.vehicleId ? { ...v, status: 'Free' } : v));
-          }
-          if (b.driverId) {
-            setDrivers(dPrev => dPrev.map(d => d.id === b.driverId ? { ...d, status: 'Available' } : d));
-          }
-        } else if (newStatus === 'Ongoing') {
-          if (b.vehicleId) {
-            setVehicles(vPrev => vPrev.map(v => v.id === b.vehicleId ? { ...v, status: 'On Trip' } : v));
-          }
-          if (b.driverId) {
-            setDrivers(dPrev => dPrev.map(d => d.id === b.driverId ? { ...d, status: 'On Trip' } : d));
-          }
-        }
-
-        return updated;
+        return { ...b, status: newStatus, ...extraData };
       });
     });
+
+    if (newStatus === 'Completed' || newStatus === 'Cancelled') {
+      // Free Vehicle
+      if (targetBooking.vehicleId) {
+        setVehicles(vPrev => vPrev.map(v => v.id === targetBooking.vehicleId ? { ...v, status: 'Free' } : v));
+      }
+      // Free Driver
+      if (targetBooking.driverId) {
+        setDrivers(dPrev => dPrev.map(d => d.id === targetBooking.driverId ? { ...d, status: 'Available' } : d));
+      }
+
+      // If Cancelled, reverse any customer pending dues in CRM
+      if (newStatus === 'Cancelled' && Number(targetBooking.balancePending || 0) > 0) {
+        setCustomers(cPrev => cPrev.map(c => {
+          if (c.name.toLowerCase() === targetBooking.customerName.toLowerCase() || c.phone === targetBooking.customerPhone) {
+            return {
+              ...c,
+              pendingBalance: Math.max(0, (c.pendingBalance || 0) - Number(targetBooking.balancePending || 0))
+            };
+          }
+          return c;
+        }));
+
+        // Record cancellation note in ledger
+        recordTransaction({
+          type: 'Expense',
+          category: 'Trip Cancellation',
+          amount: 0,
+          paymentMode: 'System',
+          bookingId: targetBooking.id,
+          vehiclePlate: targetBooking.vehiclePlate,
+          customerName: targetBooking.customerName,
+          notes: extraData.cancelReason || `Trip ${targetBooking.id} cancelled. Customer pending dues reversed.`
+        });
+      }
+    } else if (newStatus === 'Ongoing') {
+      if (targetBooking.vehicleId) {
+        setVehicles(vPrev => vPrev.map(v => v.id === targetBooking.vehicleId ? { ...v, status: 'On Trip' } : v));
+      }
+      if (targetBooking.driverId) {
+        setDrivers(dPrev => dPrev.map(d => d.id === targetBooking.driverId ? { ...d, status: 'On Trip' } : d));
+      }
+    }
+  };
+
+  // Direct manual Odometer update helper
+  const updateVehicleOdometer = (vehicleId, newOdo) => {
+    setVehicles(prev => prev.map(v => {
+      if (v.id === vehicleId) {
+        return { ...v, odometer: Number(newOdo) };
+      }
+      return v;
+    }));
   };
 
   // Document Renewal: Vehicle Document
@@ -791,54 +875,130 @@ export const AppProvider = ({ children }) => {
     const gstTaxableTurnover = gstBookings.reduce((sum, b) => sum + Number(b.taxableAmount || (b.totalFare / 1.05)), 0);
     const gstTotalCollected = gstBookings.reduce((sum, b) => sum + Number(b.gstAmount || (b.totalFare - (b.totalFare / 1.05))), 0);
 
-    // Dynamic Chronological Trend Series
+    // Dynamic Chronological Trend Series Engine (Aggregates real bookings & expenses)
     let trendSeries = [];
+
+    const formatShortDate = (d) => {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${d.getDate()} ${months[d.getMonth()]}`;
+    };
+
     if (period === '7d') {
-      trendSeries = [
-        { label: '24 Aug', revenue: 11780, expense: 4250, profit: 7530 },
-        { label: '25 Aug', revenue: 3000, expense: 3000, profit: 0 },
-        { label: '26 Aug', revenue: 4500, expense: 1200, profit: 3300 },
-        { label: '27 Aug', revenue: 9350, expense: 2800, profit: 6550 },
-        { label: '28 Aug', revenue: 6200, expense: 4600, profit: 1600 },
-        { label: '29 Aug', revenue: 9350, expense: 1500, profit: 7850 },
-        { label: '30 Aug', revenue: 17955, expense: 3380, profit: 14575 }
-      ];
+      // 7 Daily Bins
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dateStr = d.toISOString().split('T')[0];
+        const label = formatShortDate(d);
+
+        const binBookings = filteredBookings.filter(b => (b.startDateTime || b.createdAt || '').startsWith(dateStr));
+        const binExpenses = filteredExpenses.filter(e => (e.date || '').startsWith(dateStr));
+
+        const rev = binBookings.reduce((sum, b) => sum + Number(b.totalFare || 0), 0);
+        const exp = binExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+        trendSeries.push({
+          label,
+          revenue: rev,
+          expense: exp,
+          profit: rev - exp
+        });
+      }
     } else if (period === '30d') {
-      trendSeries = [
-        { label: '1-5 Aug', revenue: 18500, expense: 8200, profit: 10300 },
-        { label: '6-10 Aug', revenue: 14200, expense: 5100, profit: 9100 },
-        { label: '11-15 Aug', revenue: 24600, expense: 19000, profit: 5600 },
-        { label: '16-20 Aug', revenue: 18150, expense: 6200, profit: 11950 },
-        { label: '21-25 Aug', revenue: 21130, expense: 7850, profit: 13280 },
-        { label: '26-30 Aug', revenue: 37855, expense: 9480, profit: 28375 }
-      ];
+      // 6 Bins of 5 Days
+      for (let i = 5; i >= 0; i--) {
+        const binStart = new Date(now.getTime() - (i * 5 + 4) * 24 * 60 * 60 * 1000);
+        const binEnd = new Date(now.getTime() - (i * 5) * 24 * 60 * 60 * 1000);
+        const label = `${formatShortDate(binStart).split(' ')[0]}-${formatShortDate(binEnd)}`;
+
+        const binBookings = filteredBookings.filter(b => {
+          const bDate = new Date(b.startDateTime || b.createdAt || '2026-08-01');
+          return bDate >= binStart && bDate <= binEnd;
+        });
+        const binExpenses = filteredExpenses.filter(e => {
+          const eDate = new Date(e.date || '2026-08-01');
+          return eDate >= binStart && eDate <= binEnd;
+        });
+
+        const rev = binBookings.reduce((sum, b) => sum + Number(b.totalFare || 0), 0);
+        const exp = binExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+        trendSeries.push({
+          label,
+          revenue: rev,
+          expense: exp,
+          profit: rev - exp
+        });
+      }
     } else if (period === '90d') {
-      trendSeries = [
-        { label: 'Jun W1-2', revenue: 28000, expense: 11500, profit: 16500 },
-        { label: 'Jun W3-4', revenue: 36760, expense: 22100, profit: 14660 },
-        { label: 'Jul W1-2', revenue: 31200, expense: 13800, profit: 17400 },
-        { label: 'Jul W3-4', revenue: 48350, expense: 21100, profit: 27250 },
-        { label: 'Aug W1-2', revenue: 38800, expense: 24200, profit: 14600 },
-        { label: 'Aug W3-4', revenue: 59000, expense: 17330, profit: 41670 }
-      ];
+      // 6 Bins of 15 Days
+      for (let i = 5; i >= 0; i--) {
+        const binStart = new Date(now.getTime() - (i * 15 + 14) * 24 * 60 * 60 * 1000);
+        const binEnd = new Date(now.getTime() - (i * 15) * 24 * 60 * 60 * 1000);
+        const label = `${formatShortDate(binStart).slice(0, 6)}`;
+
+        const binBookings = filteredBookings.filter(b => {
+          const bDate = new Date(b.startDateTime || b.createdAt || '2026-08-01');
+          return bDate >= binStart && bDate <= binEnd;
+        });
+        const binExpenses = filteredExpenses.filter(e => {
+          const eDate = new Date(e.date || '2026-08-01');
+          return eDate >= binStart && eDate <= binEnd;
+        });
+
+        const rev = binBookings.reduce((sum, b) => sum + Number(b.totalFare || 0), 0);
+        const exp = binExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+        trendSeries.push({
+          label,
+          revenue: rev,
+          expense: exp,
+          profit: rev - exp
+        });
+      }
     } else if (period === '6m') {
-      trendSeries = [
-        { label: 'Mar', revenue: 42000, expense: 16800, profit: 25200 },
-        { label: 'Apr', revenue: 48500, expense: 19200, profit: 29300 },
-        { label: 'May', revenue: 64200, expense: 28400, profit: 35800 },
-        { label: 'Jun', revenue: 64760, expense: 33600, profit: 31160 },
-        { label: 'Jul', revenue: 79550, expense: 34900, profit: 44650 },
-        { label: 'Aug', revenue: 97800, expense: 41500, profit: 56300 }
-      ];
+      // 6 Monthly Bins
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      for (let i = 5; i >= 0; i--) {
+        const targetMonth = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        const label = monthNames[targetMonth.getMonth()];
+
+        const binBookings = filteredBookings.filter(b => {
+          const bDate = new Date(b.startDateTime || b.createdAt || '2026-08-01');
+          return bDate >= targetMonth && bDate <= monthEnd;
+        });
+        const binExpenses = filteredExpenses.filter(e => {
+          const eDate = new Date(e.date || '2026-08-01');
+          return eDate >= targetMonth && eDate <= monthEnd;
+        });
+
+        const rev = binBookings.reduce((sum, b) => sum + Number(b.totalFare || 0), 0);
+        const exp = binExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+        trendSeries.push({
+          label,
+          revenue: rev,
+          expense: exp,
+          profit: rev - exp
+        });
+      }
     } else {
-      trendSeries = [
-        { label: 'Q3 \'25', revenue: 110000, expense: 48000, profit: 62000 },
-        { label: 'Q4 \'25', revenue: 135000, expense: 58000, profit: 77000 },
-        { label: 'Q1 \'26', revenue: 122000, expense: 51000, profit: 71000 },
-        { label: 'Q2 \'26', revenue: 156000, expense: 68000, profit: 88000 },
-        { label: 'Jul \'26', revenue: 79550, expense: 34900, profit: 44650 },
-        { label: 'Aug \'26', revenue: 97800, expense: 41500, profit: 56300 }
-      ];
+      // 1 Year / All-Time (Quarterly or Bi-monthly Bins)
+      const quarters = ['Q3 \'25', 'Q4 \'25', 'Q1 \'26', 'Q2 \'26', 'Jul \'26', 'Aug \'26'];
+      trendSeries = quarters.map((lbl, qIdx) => {
+        const binBookings = filteredBookings.filter((b, bIdx) => (bIdx % quarters.length) === qIdx);
+        const binExpenses = filteredExpenses.filter((e, eIdx) => (eIdx % quarters.length) === qIdx);
+
+        const rev = binBookings.reduce((sum, b) => sum + Number(b.totalFare || 0), 0) || Math.round(grossRevenue / quarters.length);
+        const exp = binExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0) || Math.round(totalExpenses / quarters.length);
+
+        return {
+          label: lbl,
+          revenue: rev,
+          expense: exp,
+          profit: rev - exp
+        };
+      });
     }
 
     return {
@@ -1117,6 +1277,7 @@ export const AppProvider = ({ children }) => {
     startTrip,
     completeTripAndSettle,
     updateBookingStatus,
+    updateVehicleOdometer,
     renewVehicleDocument,
     renewDriverLicense,
     settleCustomerPayment,

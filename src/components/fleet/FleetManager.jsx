@@ -21,6 +21,7 @@ export const FleetManager = () => {
     t,
     vehicles,
     addVehicle,
+    updateVehicleOdometer,
     checkVehicleClash,
     isNewVehicleOpen,
     setIsNewVehicleOpen
@@ -28,8 +29,12 @@ export const FleetManager = () => {
 
   const [filterCategory, setFilterCategory] = useState('All');
   const [selectedVehicleForCheck, setSelectedVehicleForCheck] = useState(null);
-  const [checkDate, setCheckDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedVehicleForOdo, setSelectedVehicleForOdo] = useState(null);
+  const [odoInput, setOdoInput] = useState('');
+
+  const [checkStartDate, setCheckStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [checkStartTime, setCheckStartTime] = useState('09:00');
+  const [checkEndDate, setCheckEndDate] = useState(new Date().toISOString().slice(0, 10));
   const [checkEndTime, setCheckEndTime] = useState('20:00');
   const [clashResult, setClashResult] = useState(null);
 
@@ -58,21 +63,38 @@ export const FleetManager = () => {
 
   const handleClashCheck = () => {
     if (!selectedVehicleForCheck) return;
-    const startStr = `${checkDate}T${checkStartTime}`;
-    const endStr = `${checkDate}T${checkEndTime}`;
+    const startStr = `${checkStartDate}T${checkStartTime}`;
+    const endStr = `${checkEndDate}T${checkEndTime}`;
+
+    if (new Date(endStr) <= new Date(startStr)) {
+      setClashResult({
+        isAvailable: false,
+        message: `⚠️ End date/time must be after start date/time.`
+      });
+      return;
+    }
+
     const clash = checkVehicleClash(selectedVehicleForCheck.id, startStr, endStr);
 
     if (clash) {
       setClashResult({
         isAvailable: false,
-        message: `❌ Booked for ${clash.customerName} (${clash.tripType}) from ${new Date(clash.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} to ${new Date(clash.endDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+        message: `❌ Booked for ${clash.customerName} (${clash.tripType}) from ${new Date(clash.startDateTime).toLocaleDateString([], { day: 'numeric', month: 'short' })} ${new Date(clash.startDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} to ${new Date(clash.endDateTime).toLocaleDateString([], { day: 'numeric', month: 'short' })} ${new Date(clash.endDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
       });
     } else {
       setClashResult({
         isAvailable: true,
-        message: `✅ Car is 100% Free on ${checkDate} between ${checkStartTime} and ${checkEndTime}!`
+        message: `✅ Car is 100% Free from ${checkStartDate} ${checkStartTime} to ${checkEndDate} ${checkEndTime}!`
       });
     }
+  };
+
+  const handleOdometerSave = (e) => {
+    e.preventDefault();
+    if (!selectedVehicleForOdo || !odoInput) return;
+    updateVehicleOdometer(selectedVehicleForOdo.id, Number(odoInput));
+    setSelectedVehicleForOdo(null);
+    setOdoInput('');
   };
 
   const handleAddVehicleSubmit = (e) => {
@@ -202,10 +224,18 @@ export const FleetManager = () => {
                     <span>{veh.seats} Seats</span>
                   </span>
                   <span>•</span>
-                  <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedVehicleForOdo(veh);
+                      setOdoInput(veh.odometer || 0);
+                    }}
+                    title="Click to calibrate odometer"
+                    className="flex items-center gap-1 hover:text-amber-700 font-bold underline decoration-dotted"
+                  >
                     <Gauge className="w-3.5 h-3.5 text-gray-600" />
-                    <span>{veh.odometer?.toLocaleString()} KM</span>
-                  </span>
+                    <span>{veh.odometer?.toLocaleString()} KM ✏️</span>
+                  </button>
                 </div>
               </div>
 
@@ -221,8 +251,8 @@ export const FleetManager = () => {
                 </div>
               </div>
 
-              {/* Action: Check Free Slot */}
-              <div className="pt-1">
+              {/* Action Buttons */}
+              <div className="pt-1 grid grid-cols-2 gap-2">
                 <button
                   onClick={() => {
                     setSelectedVehicleForCheck(veh);
@@ -233,19 +263,30 @@ export const FleetManager = () => {
                   <Calendar className="w-3.5 h-3.5 text-accent-amber" />
                   <span>{t('btnCheckFree')}</span>
                 </button>
+
+                <button
+                  onClick={() => {
+                    setSelectedVehicleForOdo(veh);
+                    setOdoInput(veh.odometer || 0);
+                  }}
+                  className="w-full py-2 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-100 tap-active shadow-xs"
+                >
+                  <Gauge className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Set KM</span>
+                </button>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Date Clash Checker Modal */}
+      {/* Date Clash Checker Modal (Supports Multi-day & Intra-day ranges) */}
       {selectedVehicleForCheck && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-[380px] w-full p-5 shadow-2xl border border-card-border space-y-4">
+          <div className="bg-white rounded-3xl max-w-[400px] w-full p-5 shadow-2xl border border-card-border space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-extrabold text-gray-900">
-                🔍 Check Availability Slot
+                🔍 Check Slot Availability
               </h3>
               <button
                 onClick={() => setSelectedVehicleForCheck(null)}
@@ -260,19 +301,18 @@ export const FleetManager = () => {
             </p>
 
             <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                  Target Date
-                </label>
-                <input
-                  type="date"
-                  value={checkDate}
-                  onChange={e => setCheckDate(e.target.value)}
-                  className="w-full bg-[#FBF8F2] border border-card-border rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={checkStartDate}
+                    onChange={e => setCheckStartDate(e.target.value)}
+                    className="w-full bg-[#FBF8F2] border border-card-border rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                  />
+                </div>
                 <div>
                   <label className="text-[11px] font-bold text-gray-700 block mb-1">
                     Start Time
@@ -281,7 +321,21 @@ export const FleetManager = () => {
                     type="time"
                     value={checkStartTime}
                     onChange={e => setCheckStartTime(e.target.value)}
-                    className="w-full bg-[#FBF8F2] border border-card-border rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                    className="w-full bg-[#FBF8F2] border border-card-border rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={checkEndDate}
+                    onChange={e => setCheckEndDate(e.target.value)}
+                    className="w-full bg-[#FBF8F2] border border-card-border rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -292,7 +346,7 @@ export const FleetManager = () => {
                     type="time"
                     value={checkEndTime}
                     onChange={e => setCheckEndTime(e.target.value)}
-                    className="w-full bg-[#FBF8F2] border border-card-border rounded-xl px-3 py-2 text-xs font-bold text-gray-900 focus:outline-none"
+                    className="w-full bg-[#FBF8F2] border border-card-border rounded-xl px-2.5 py-1.5 text-xs font-bold text-gray-900 focus:outline-none"
                   />
                 </div>
               </div>
@@ -317,6 +371,63 @@ export const FleetManager = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Manual Odometer Calibration Modal */}
+      {selectedVehicleForOdo && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <form
+            onSubmit={handleOdometerSave}
+            className="bg-white rounded-3xl max-w-[340px] w-full p-5 shadow-2xl border border-card-border space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-extrabold text-gray-900 flex items-center gap-1.5">
+                <Gauge className="w-4 h-4 text-amber-600" />
+                <span>Calibrate Odometer</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedVehicleForOdo(null)}
+                className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-text-secondary">
+              Vehicle: <b>{selectedVehicleForOdo.plate}</b> ({selectedVehicleForOdo.brand} {selectedVehicleForOdo.model})
+            </p>
+
+            <div>
+              <label className="text-[11px] font-bold text-gray-700 block mb-1">
+                Current Odometer Reading (KM)
+              </label>
+              <input
+                type="number"
+                required
+                value={odoInput}
+                onChange={e => setOdoInput(e.target.value)}
+                className="w-full bg-[#FBF8F2] border border-card-border rounded-xl px-3 py-2 text-sm font-mono font-black text-gray-900 focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div className="flex space-x-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setSelectedVehicleForOdo(null)}
+                className="flex-1 py-2 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-xs"
+              >
+                Save Reading
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

@@ -105,9 +105,11 @@ export const TripDetailModal = ({ booking, onClose }) => {
     onClose();
   };
 
+  const [cancelReason, setCancelReason] = useState('Customer requested cancellation');
+
   // Cancel Trip Action
   const handleCancelTrip = () => {
-    updateBookingStatus(booking.id, 'Cancelled');
+    updateBookingStatus(booking.id, 'Cancelled', { cancelReason });
     setShowCancelPrompt(false);
     onClose();
   };
@@ -495,23 +497,40 @@ export const TripDetailModal = ({ booking, onClose }) => {
             <div className="bg-rose-50 rounded-3xl p-4 border-2 border-rose-300 space-y-3 animate-fade-in">
               <div className="flex items-center space-x-2 text-rose-950 font-black text-xs">
                 <AlertCircle className="w-4 h-4 text-rose-600" />
-                <span>Are you sure you want to cancel this trip?</span>
+                <span>Cancel Booking {booking.id}</span>
               </div>
-              <p className="text-[11px] text-rose-800">
-                This will release the assigned vehicle and driver back to available pool.
+              <div>
+                <label className="text-[11px] font-bold text-rose-900 block mb-1">
+                  Reason for Cancellation
+                </label>
+                <select
+                  value={cancelReason}
+                  onChange={e => setCancelReason(e.target.value)}
+                  className="w-full bg-white border border-rose-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-rose-950 focus:outline-none"
+                >
+                  <option value="Customer requested cancellation">Customer requested cancellation</option>
+                  <option value="Customer changed travel plan">Customer changed travel plan</option>
+                  <option value="Vehicle technical breakdown">Vehicle technical breakdown</option>
+                  <option value="Driver unavailable">Driver unavailable</option>
+                  <option value="Duplicate booking / Mistake">Duplicate booking / Mistake</option>
+                </select>
+              </div>
+              <p className="text-[10px] text-rose-800 bg-white/80 p-2 rounded-xl border border-rose-200 font-semibold">
+                ✓ Releasing car {booking.vehiclePlate} and driver {booking.driverName}.<br />
+                ✓ Any {formatCurrency(booking.balancePending)} pending customer dues will be immediately reversed in CRM.
               </p>
-              <div className="flex space-x-2">
+              <div className="flex space-x-2 pt-1">
                 <button
                   onClick={() => setShowCancelPrompt(false)}
                   className="flex-1 py-2 rounded-xl bg-white border border-rose-200 text-xs font-bold text-gray-700"
                 >
-                  No, Keep Trip
+                  Keep Booking
                 </button>
                 <button
                   onClick={handleCancelTrip}
                   className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-xs"
                 >
-                  Yes, Cancel Trip
+                  Confirm Cancel
                 </button>
               </div>
             </div>

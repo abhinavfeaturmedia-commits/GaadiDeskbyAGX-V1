@@ -74,40 +74,49 @@ export const NewBookingWizard = ({ onClose }) => {
     };
   }, []);
 
-  // Auto-fill from rate cards when trip type changes
+  // Auto-fill from rate cards when trip type OR vehicle changes
   useEffect(() => {
-    if (formData.tripType === 'Local') {
-      const rc = rateCards.find(r => r.tripType === 'Local') || rateCards[0];
-      setFormData(prev => ({
-        ...prev,
-        baseFare: rc.basePrice || 1800,
-        ratePerKm: rc.extraKmRate || 14,
-        driverBata: 0,
-        nightHalt: 0,
-        gstPercent: rc.defaultGstPercent || 5
-      }));
-    } else if (formData.tripType === 'Airport') {
-      const rc = rateCards.find(r => r.tripType === 'Airport') || rateCards[1];
-      setFormData(prev => ({
-        ...prev,
-        baseFare: rc.basePrice || 2800,
-        ratePerKm: rc.extraKmRate || 15,
-        driverBata: 0,
-        nightHalt: 0,
-        gstPercent: rc.defaultGstPercent || 5
-      }));
-    } else if (formData.tripType === 'Outstation') {
-      const rc = rateCards.find(r => r.tripType === 'Outstation') || rateCards[2];
-      setFormData(prev => ({
-        ...prev,
-        ratePerKm: rc.perKmRate || 16,
-        driverBata: rc.driverBata || 400,
-        nightHalt: rc.nightHalt || 300,
-        baseFare: (rc.perKmRate || 16) * (prev.estimatedKm || 300),
-        gstPercent: rc.defaultGstPercent || 5
-      }));
+    const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
+    const category = selectedVehicle?.category || 'Sedan';
+
+    // Find rate card matching both tripType and category, or fallback to tripType
+    const matchingRc = rateCards.find(r => r.tripType === formData.tripType && r.category === category)
+      || rateCards.find(r => r.tripType === formData.tripType)
+      || rateCards[0];
+
+    if (matchingRc) {
+      if (formData.tripType === 'Local' || formData.tripType === 'Airport') {
+        setFormData(prev => ({
+          ...prev,
+          baseFare: matchingRc.basePrice || 1800,
+          ratePerKm: matchingRc.extraKmRate || 14,
+          driverBata: 0,
+          nightHalt: 0,
+          gstPercent: matchingRc.defaultGstPercent || 5
+        }));
+      } else if (formData.tripType === 'Outstation') {
+        setFormData(prev => ({
+          ...prev,
+          ratePerKm: matchingRc.perKmRate || 14,
+          driverBata: matchingRc.driverBata || 400,
+          nightHalt: matchingRc.nightHalt || 300,
+          baseFare: (matchingRc.perKmRate || 14) * (prev.estimatedKm || 250),
+          gstPercent: matchingRc.defaultGstPercent || 5
+        }));
+      } else if (formData.tripType === 'Rental') {
+        setFormData(prev => ({
+          ...prev,
+          baseFare: matchingRc.basePrice || 2000,
+          ratePerKm: matchingRc.extraKmRate || 10,
+          securityDeposit: matchingRc.securityDeposit || 5000,
+          fuelPolicy: matchingRc.fuelPolicy || 'Same to Same',
+          driverBata: 0,
+          nightHalt: 0,
+          gstPercent: matchingRc.defaultGstPercent || 5
+        }));
+      }
     }
-  }, [formData.tripType]);
+  }, [formData.tripType, formData.vehicleId, rateCards, vehicles]);
 
   // Recalculate Totals
   const calculateTotals = () => {
@@ -129,7 +138,7 @@ export const NewBookingWizard = ({ onClose }) => {
 
   // Clash Check when vehicle or driver or dates change
   const runClashCheck = (vId, dId, start, end) => {
-    const { vehicleConflict, driverConflict } = checkBookingClash(vId, dId, start, end);
+    const { vehicleConflict, driverConflict } = checkBookingClash(vId, dId, start, end, null, formData.tripType);
     
     if (vehicleConflict || driverConflict) {
       setClashError({
@@ -498,6 +507,56 @@ export const NewBookingWizard = ({ onClose }) => {
                 </div>
               </div>
 
+              {/* Self-Drive Rental Specifics (if Rental) */}
+              {formData.tripType === 'Rental' && (
+                <div className="bg-amber-50 rounded-3xl p-4 border-2 border-amber-300 space-y-3 shadow-xs">
+                  <h4 className="text-xs font-black text-amber-950 uppercase tracking-wider flex items-center gap-1">
+                    <span>🔑 Self-Drive Rental Terms</span>
+                  </h4>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-[11px] font-bold text-amber-900 block mb-1">
+                        Security Deposit (₹)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.securityDeposit}
+                        onChange={e => setFormData(prev => ({ ...prev, securityDeposit: Number(e.target.value) }))}
+                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-amber-950 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-amber-900 block mb-1">
+                        Fuel Policy
+                      </label>
+                      <select
+                        value={formData.fuelPolicy}
+                        onChange={e => setFormData(prev => ({ ...prev, fuelPolicy: e.target.value }))}
+                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-amber-950 focus:outline-none"
+                      >
+                        <option value="Same to Same">Same to Same</option>
+                        <option value="Full to Full">Full to Full</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-900 block mb-1">
+                      Customer Driving License / Aadhaar No.
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. MH12 20180091283"
+                      value={formData.customerAadhaarOrDl}
+                      onChange={e => setFormData(prev => ({ ...prev, customerAadhaarOrDl: e.target.value }))}
+                      className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-bold text-amber-950 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Advance & Payment Settlement */}
               <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] space-y-3 shadow-xs">
                 <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">
@@ -543,6 +602,12 @@ export const NewBookingWizard = ({ onClose }) => {
                     <div className="flex justify-between text-[#4B5563] font-semibold">
                       <span>GST (5%):</span>
                       <span className="font-bold text-[#111827]">{formatCurrency(gstAmount)}</span>
+                    </div>
+                  )}
+                  {formData.tripType === 'Rental' && formData.securityDeposit > 0 && (
+                    <div className="flex justify-between text-amber-800 font-semibold">
+                      <span>Refundable Deposit:</span>
+                      <span className="font-bold">{formatCurrency(formData.securityDeposit)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-sm font-black text-[#111827] pt-1 border-t border-[#E5DFD3]">
