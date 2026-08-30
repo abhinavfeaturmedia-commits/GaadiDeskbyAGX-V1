@@ -1,0 +1,402 @@
+import React, { useState } from 'react';
+import { useApp } from '../../context/AppContext';
+import {
+  Car,
+  Navigation,
+  Wallet,
+  Users,
+  FileText,
+  ShieldAlert,
+  Sparkles,
+  PlusCircle,
+  TrendingUp,
+  Clock,
+  MapPin,
+  ChevronRight,
+  MoreHorizontal,
+  Search,
+  CheckCircle2,
+  Calendar,
+  AlertTriangle,
+  Play,
+  Gauge
+} from 'lucide-react';
+import { FleetHealthRingWidget } from './FleetHealthRingWidget';
+
+export const HomeDashboard = () => {
+  const {
+    t,
+    language,
+    business,
+    vehicles,
+    drivers,
+    bookings,
+    getDocumentAlerts,
+    getFinancialStats,
+    getFleetStats,
+    setActiveTab,
+    activePill,
+    setActivePill,
+    openMoreSubView,
+    setIsNewBookingOpen,
+    setIsNotificationsOpen,
+    setSelectedInvoiceBooking,
+    setSettlementBooking,
+    formatCurrency
+  } = useApp();
+
+  const financialStats = getFinancialStats();
+  const fleetStats = getFleetStats();
+  const alerts = getDocumentAlerts();
+
+  // Find current on-trip or ongoing bookings
+  const ongoingTrips = bookings.filter(b => b.status === 'Ongoing');
+  const ongoingTrip = ongoingTrips[0] || bookings.find(b => b.status === 'Confirmed' || b.status === 'Driver Assigned');
+
+  const [selectedDayIndex, setSelectedDayIndex] = useState(3); // Wednesday (T=12)
+
+  // Category Filter Pills
+  const isHindi = language === 'hi';
+  const pillCategories = [
+    { id: 'all', label: isHindi ? 'ओवरव्यू' : 'Overview' },
+    { id: 'bookings', label: isHindi ? 'बुकिंग्स' : 'Bookings' },
+    { id: 'fleet', label: isHindi ? 'फ्लीट' : 'Fleet' },
+    { id: 'money', label: isHindi ? 'हिसाब' : 'Money' },
+    { id: 'papers', label: isHindi ? 'कागजात' : 'Papers Vault' },
+    { id: 'customers', label: isHindi ? 'ग्राहक' : 'Customers' }
+  ];
+
+  // Weekly calendar strip dates
+  const weekDays = [
+    { day: 'S', date: 9 },
+    { day: 'M', date: 10 },
+    { day: 'T', date: 11 },
+    { day: 'W', date: 12 },
+    { day: 'T', date: 13 },
+    { day: 'F', date: 14 },
+    { day: 'S', date: 15 },
+  ];
+
+  return (
+    <div className="space-y-4 pt-1 animate-fade-in">
+      {/* 1. Expressive Headline */}
+      <div className="space-y-0.5 pt-1">
+        <h1 className="text-2xl font-black text-[#111827] tracking-tight leading-snug">
+          {t('headerTitle')}
+        </h1>
+        <p className="text-xs text-[#4B5563] font-semibold">
+          {business.name} • {business.city} ({vehicles.length} Fleet Cars)
+        </p>
+      </div>
+
+      {/* 2. Pill Filter Tabs */}
+      <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
+        {pillCategories.map(cat => {
+          const isActive = activePill === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => {
+                setActivePill(cat.id);
+                if (cat.id === 'bookings') setActiveTab('trips');
+                else if (cat.id === 'fleet') setActiveTab('fleet');
+                else if (cat.id === 'money') setActiveTab('money');
+                else if (cat.id === 'papers') openMoreSubView('papers');
+                else if (cat.id === 'customers') openMoreSubView('crm');
+              }}
+              className={`px-4 py-1.5 rounded-full text-xs font-black transition-all whitespace-nowrap tap-active ${
+                isActive
+                  ? 'bg-[#111827] text-white shadow-xs scale-102'
+                  : 'bg-white border-2 border-[#E5DFD3] text-[#374151] hover:bg-gray-50'
+              }`}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 3. Document Expiry Alert Banner (if any) */}
+      {alerts.length > 0 && (
+        <div
+          onClick={() => setIsNotificationsOpen(true)}
+          className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-3.5 flex items-center justify-between cursor-pointer shadow-xs tap-active"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-2xl bg-amber-200 flex items-center justify-center text-amber-900 font-bold">
+              <ShieldAlert className="w-5 h-5 text-amber-900" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-amber-950">
+                {alerts[0].vehiclePlate || alerts[0].driverName} ({alerts[0].docType})
+              </p>
+              <p className="text-[11px] text-amber-800 font-bold">
+                {alerts[0].isExpired ? '⚠️ RTO Document EXPIRED' : `⏳ ${alerts[0].daysLeft} days left to renew`}
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2.5 py-1 rounded-full shadow-xs">
+            {alerts.length} Alerts
+          </span>
+        </div>
+      )}
+
+      {/* 4. Fleet Occupancy & Revenue Target Circular Donut Ring Widget */}
+      <FleetHealthRingWidget />
+
+      {/* 5. Fleet Status Pulse Matrix */}
+      <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs space-y-3 stagger-1">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-black text-[#111827] uppercase tracking-wider">
+            {t('fleetPulseTitle')}
+          </h3>
+          <button
+            onClick={() => setActiveTab('fleet')}
+            className="text-[#4B5563] hover:text-[#111827] p-1 font-bold text-xs"
+          >
+            View Fleet ➔
+          </button>
+        </div>
+
+        {/* 5 Circular Status Avatars */}
+        <div className="flex items-center justify-between pt-1 px-1">
+          {/* Free Cars */}
+          <div
+            onClick={() => setActiveTab('fleet')}
+            className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
+          >
+            <div className="w-12 h-12 rounded-full bg-[#EBF7EE] border border-green-300 flex items-center justify-center text-green-700 shadow-xs">
+              <span className="text-base">🟢</span>
+            </div>
+            <span className="text-[11px] font-black text-[#111827]">{fleetStats.free}</span>
+            <span className="text-[9px] font-bold text-[#4B5563]">{t('carsFree')}</span>
+          </div>
+
+          {/* On-Road */}
+          <div
+            onClick={() => setActiveTab('trips')}
+            className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
+          >
+            <div className="w-12 h-12 rounded-full bg-[#FEF3C7] border border-amber-300 flex items-center justify-center text-amber-700 shadow-xs">
+              <span className="text-base">🚖</span>
+            </div>
+            <span className="text-[11px] font-black text-[#111827]">{fleetStats.onTrip}</span>
+            <span className="text-[9px] font-bold text-[#4B5563]">{t('carsOnTrip')}</span>
+          </div>
+
+          {/* Workshop */}
+          <div
+            onClick={() => setActiveTab('fleet')}
+            className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
+          >
+            <div className="w-12 h-12 rounded-full bg-[#FEE2E2] border border-red-300 flex items-center justify-center text-red-700 shadow-xs">
+              <span className="text-base">🔧</span>
+            </div>
+            <span className="text-[11px] font-black text-[#111827]">{fleetStats.workshop}</span>
+            <span className="text-[9px] font-bold text-[#4B5563]">{t('carsMaintenance')}</span>
+          </div>
+
+          {/* Today Collection */}
+          <div
+            onClick={() => setActiveTab('money')}
+            className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
+          >
+            <div className="w-12 h-12 rounded-full bg-[#E0F2FE] border border-blue-300 flex items-center justify-center text-blue-700 shadow-xs">
+              <span className="text-base">💵</span>
+            </div>
+            <span className="text-[11px] font-black text-[#111827]">
+              ₹{(financialStats.totalCollectedToday / 1000).toFixed(1)}k
+            </span>
+            <span className="text-[9px] font-bold text-[#4B5563]">{t('todayCollection')}</span>
+          </div>
+
+          {/* Expiry Alerts */}
+          <div
+            onClick={() => setIsNotificationsOpen(true)}
+            className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
+          >
+            <div className="w-12 h-12 rounded-full bg-[#FCE7F3] border border-pink-300 flex items-center justify-center text-pink-700 shadow-xs">
+              <span className="text-base">⚠️</span>
+            </div>
+            <span className="text-[11px] font-black text-[#111827]">{alerts.length}</span>
+            <span className="text-[9px] font-bold text-[#4B5563]">Alerts</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. 6 Master Action Tiles */}
+      <div className="space-y-2 stagger-2">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-black text-[#111827] uppercase tracking-wider">
+            Quick Operations
+          </h3>
+          <span
+            onClick={() => setIsNewBookingOpen(true)}
+            className="text-xs font-black text-[#EA580C] flex items-center gap-0.5 cursor-pointer hover:underline"
+          >
+            <span>+ Create Booking</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Tile 1: New Booking */}
+          <div
+            onClick={() => setIsNewBookingOpen(true)}
+            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+              <PlusCircle className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-[#111827]">{t('tileNewBooking')}</h4>
+              <p className="text-[10px] text-[#4B5563] font-semibold">{t('tileNewBookingSub')}</p>
+            </div>
+          </div>
+
+          {/* Tile 2: Today's Trips */}
+          <div
+            onClick={() => setActiveTab('trips')}
+            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-sky-100 flex items-center justify-center text-sky-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+              <Navigation className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-[#111827]">{t('tileTodayTrips')}</h4>
+              <p className="text-[10px] text-[#4B5563] font-semibold">
+                {bookings.filter(b => b.status === 'Ongoing').length} active on-road
+              </p>
+            </div>
+          </div>
+
+          {/* Tile 3: Cars Fleet */}
+          <div
+            onClick={() => setActiveTab('fleet')}
+            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+              <Car className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-[#111827]">{t('tileFleet')}</h4>
+              <p className="text-[10px] text-[#4B5563] font-semibold">
+                {vehicles.length} cars registered
+              </p>
+            </div>
+          </div>
+
+          {/* Tile 4: Daily Money */}
+          <div
+            onClick={() => setActiveTab('money')}
+            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+              <Wallet className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-[#111827]">{t('tileMoney')}</h4>
+              <p className="text-[10px] text-[#4B5563] font-semibold">
+                {formatCurrency(financialStats.pendingCustomers)} due
+              </p>
+            </div>
+          </div>
+
+          {/* Tile 5: Customers CRM */}
+          <div
+            onClick={() => openMoreSubView('crm')}
+            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+              <Users className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-[#111827]">{t('tileCustomers')}</h4>
+              <p className="text-[10px] text-[#4B5563] font-semibold">{t('tileCustomersSub')}</p>
+            </div>
+          </div>
+
+          {/* Tile 6: Papers & Vault */}
+          <div
+            onClick={() => openMoreSubView('papers')}
+            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+              <FileText className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-[#111827]">RTO Papers Vault</h4>
+              <p className="text-[10px] text-[#4B5563] font-semibold">RC, Insurance, PUC Radar</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Active Trip Spotlight */}
+      {ongoingTrip && (
+        <div className="bg-white rounded-3xl p-4 border-2 border-emerald-400 shadow-xs space-y-3 stagger-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+              <span className="text-xs font-black text-[#111827]">
+                {ongoingTrip.status === 'Ongoing' ? 'Active Trip On-Road' : 'Next Scheduled Dispatch'}
+              </span>
+            </div>
+            <span className="text-[10px] font-black bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+              {ongoingTrip.tripType}
+            </span>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-black text-[#111827]">
+              {ongoingTrip.customerName}
+            </h4>
+            <p className="text-xs text-[#374151] font-bold flex items-center gap-1 mt-0.5 truncate">
+              <span>📍 {ongoingTrip.pickupLocation}</span>
+              <span>➔</span>
+              <span>{ongoingTrip.dropLocation}</span>
+            </p>
+          </div>
+
+          <div className="bg-[#F8F6F0] rounded-2xl p-2.5 border border-[#E5DFD3] flex items-center justify-between text-xs">
+            <div>
+              <p className="font-bold text-[#111827]">🚗 {ongoingTrip.vehiclePlate}</p>
+              <p className="text-[11px] text-[#4B5563] font-semibold">Driver: {ongoingTrip.driverName}</p>
+            </div>
+            <div className="text-right">
+              <p className="font-black text-[#EA580C]">{formatCurrency(ongoingTrip.totalFare)}</p>
+              <p className="text-[10px] text-rose-700 font-bold">Due: {formatCurrency(ongoingTrip.balancePending)}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 pt-1">
+            {ongoingTrip.status === 'Ongoing' ? (
+              <button
+                onClick={() => setSettlementBooking(ongoingTrip)}
+                className="flex-1 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs tap-active"
+              >
+                <Gauge className="w-4 h-4" />
+                <span>Settle Meter & Collect</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveTab('trips')}
+                className="flex-1 py-2 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs tap-active"
+              >
+                <Navigation className="w-4 h-4 text-[#D4F05B]" />
+                <span>View in Trips Dispatch</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setSelectedInvoiceBooking(ongoingTrip)}
+              className="px-3.5 py-2 rounded-full bg-white border-2 border-[#E5DFD3] text-[#111827] text-xs font-black flex items-center gap-1 hover:bg-gray-50 tap-active shadow-xs"
+            >
+              <span>Bill</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
