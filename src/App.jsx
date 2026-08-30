@@ -8,6 +8,7 @@ import { MoneyDashboard } from './components/money/MoneyDashboard';
 import { MoreMenu } from './components/more/MoreMenu';
 import { NewBookingWizard } from './components/bookings/NewBookingWizard';
 import { TripSettlementModal } from './components/bookings/TripSettlementModal';
+import { TripDetailModal } from './components/bookings/TripDetailModal';
 import { InvoiceGenerator } from './components/invoices/InvoiceGenerator';
 import { WhatsAppModal } from './components/modals/WhatsAppModal';
 import { NotificationModal } from './components/modals/NotificationModal';
@@ -31,6 +32,8 @@ const MainContent = () => {
     setSelectedInvoiceBooking,
     settlementBooking,
     setSettlementBooking,
+    selectedTripDetailBooking,
+    setSelectedTripDetailBooking,
     whatsAppData,
     setWhatsAppData
   } = useApp();
@@ -61,6 +64,13 @@ const MainContent = () => {
       {/* Global Modals & Drawers */}
       {isNewBookingOpen && (
         <NewBookingWizard onClose={() => setIsNewBookingOpen(false)} />
+      )}
+
+      {selectedTripDetailBooking && (
+        <TripDetailModal
+          booking={selectedTripDetailBooking}
+          onClose={() => setSelectedTripDetailBooking(null)}
+        />
       )}
 
       {settlementBooking && (

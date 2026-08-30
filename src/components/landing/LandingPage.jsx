@@ -65,13 +65,15 @@ export const LandingPage = () => {
       <header className="sticky top-0 z-40 bg-[#F8F6F0]/95 backdrop-blur-md border-b border-[#E5DFD3]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Brand Logo */}
-          <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-[#111827] flex items-center justify-center text-white font-black text-lg shadow-sm">
-              G
-            </div>
+          <div className="flex items-center space-x-3">
+            <img
+              src="/gaadidesk_logo.png"
+              alt="GaadiDesk by AGX"
+              className="w-10 h-10 rounded-2xl object-cover shadow-sm ring-1 ring-black/5"
+            />
             <div>
               <div className="flex items-baseline space-x-1.5">
-                <span className="text-lg font-black tracking-tight text-[#111827]">Gaadi<span className="text-[#EA580C]">Desk</span></span>
+                <span className="text-lg font-black tracking-tight text-[#111827]">Gaadi<span className="text-[#22C55E]">Desk</span></span>
                 <span className="text-[10px] font-bold text-[#4B5563] tracking-normal">by AGX</span>
               </div>
             </div>
@@ -392,11 +394,13 @@ export const LandingPage = () => {
       {/* ---------------------------------------------------- */}
       <footer className="bg-white border-t border-[#E5DFD3] py-10 px-4 sm:px-6 text-center text-xs text-[#4B5563] font-semibold">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 rounded-xl bg-[#111827] flex items-center justify-center text-white font-black text-xs">
-              G
-            </div>
-            <span className="font-black text-[#111827]">GaadiDesk <span className="text-[11px] font-bold text-[#4B5563]">by AGX</span></span>
+          <div className="flex items-center space-x-2.5">
+            <img
+              src="/gaadidesk_logo.png"
+              alt="GaadiDesk by AGX"
+              className="w-7 h-7 rounded-xl object-cover shadow-xs"
+            />
+            <span className="font-black text-[#111827]">Gaadi<span className="text-[#22C55E]">Desk</span> <span className="text-[11px] font-bold text-[#4B5563]">by AGX</span></span>
             <span>— The Indian Fleet Operating System</span>
           </div>
 

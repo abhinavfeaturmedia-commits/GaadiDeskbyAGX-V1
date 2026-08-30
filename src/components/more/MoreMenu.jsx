@@ -109,23 +109,30 @@ export const MoreMenu = () => {
       {/* Membership Banner Card */}
       <div
         onClick={() => setIsMembershipOpen(true)}
-        className="bg-[#111827] rounded-3xl p-4 text-white shadow-md cursor-pointer tap-active flex items-center justify-between border border-gray-800"
+        className="bg-[#071422] rounded-3xl p-4 text-white shadow-md cursor-pointer tap-active flex items-center justify-between border border-gray-800"
       >
-        <div className="space-y-1">
-          <div className="flex items-center space-x-1.5">
-            <Crown className="w-4 h-4 text-[#D4F05B]" />
-            <span className="text-xs font-black uppercase tracking-wider text-white">
-              GaadiDesk by AGX SaaS
-            </span>
+        <div className="flex items-center space-x-3">
+          <img
+            src="/gaadidesk_logo.png"
+            alt="GaadiDesk Logo"
+            className="w-12 h-12 rounded-2xl object-cover ring-1 ring-white/20 shadow-sm shrink-0"
+          />
+          <div className="space-y-0.5">
+            <div className="flex items-center space-x-1.5">
+              <Crown className="w-3.5 h-3.5 text-[#D4F05B]" />
+              <span className="text-[11px] font-black uppercase tracking-wider text-white">
+                GaadiDesk <span className="text-[#22C55E]">by AGX</span>
+              </span>
+            </div>
+            <h3 className="text-sm font-black text-white">
+              {business.membershipPlan.toUpperCase()} PLAN
+            </h3>
+            <p className="text-[10px] text-gray-300 font-medium">
+              Up to {business.vehicleLimit} vehicles • Valid till {business.membershipExpires}
+            </p>
           </div>
-          <h3 className="text-base font-black text-white">
-            {business.membershipPlan.toUpperCase()} PLAN
-          </h3>
-          <p className="text-[11px] text-gray-300 font-medium">
-            Up to {business.vehicleLimit} vehicles • Valid till {business.membershipExpires}
-          </p>
         </div>
-        <button className="px-3.5 py-1.5 rounded-full bg-[#D4F05B] text-[#111827] text-xs font-black shadow-xs hover:bg-[#c2de4a] tap-active">
+        <button className="px-3.5 py-1.5 rounded-full bg-[#D4F05B] text-[#111827] text-xs font-black shadow-xs hover:bg-[#c2de4a] tap-active shrink-0">
           Upgrade
         </button>
       </div>
@@ -248,7 +255,23 @@ export const MoreMenu = () => {
         </div>
       </div>
 
-      {/* RATE CARDS SUB-VIEW */}
+      {/* App Info & Verified Branding Card */}
+      <div className="bg-white/80 rounded-3xl p-4 border border-[#E5DFD3] text-center space-y-1.5 shadow-xs">
+        <div className="flex items-center justify-center space-x-2">
+          <img
+            src="/gaadidesk_logo.png"
+            alt="GaadiDesk by AGX"
+            className="w-7 h-7 rounded-xl object-cover shadow-xs"
+          />
+          <span className="text-xs font-black text-[#111827]">
+            Gaadi<span className="text-[#22C55E]">Desk</span> <span className="text-[10px] font-bold text-[#4B5563]">by AGX</span>
+          </span>
+          <span className="text-[10px] bg-[#D4F05B]/40 text-[#111827] font-black px-2 py-0.5 rounded-full border border-[#BFDD38]">v1.0 Pro</span>
+        </div>
+        <p className="text-[10px] text-gray-500 font-semibold">
+          The Indian Fleet Operating System • Built with ❤️ for Cab & Tour Operators
+        </p>
+      </div>
       {activeSubView === 'ratecards' && (
         <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs space-y-3">
           <div className="flex justify-between items-center">

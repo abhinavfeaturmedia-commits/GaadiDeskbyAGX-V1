@@ -51,8 +51,8 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
       <div className="bg-white rounded-4xl max-w-[430px] w-full max-h-[92vh] flex flex-col shadow-2xl border border-card-border overflow-hidden print:max-w-none print:shadow-none print:border-none print:rounded-none">
         {/* Header Bar */}
         <div className="px-5 py-3.5 border-b border-card-border flex items-center justify-between bg-[#FBF8F2] print:hidden">
-          <div className="flex items-center space-x-2">
-            <FileText className="w-5 h-5 text-accent-amber" />
+          <div className="flex items-center space-x-2.5">
+            <img src="/gaadidesk_logo.png" alt="GaadiDesk" className="w-6 h-6 rounded-lg object-cover shadow-xs" />
             <h3 className="text-sm font-extrabold text-[#1E232A]">
               {isGst ? 'GST Tax Invoice' : 'Trip Duty Slip & Bill'}
             </h3>
@@ -223,6 +223,15 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
               </div>
               <div className="w-24 border-b border-gray-400"></div>
             </div>
+          </div>
+
+          {/* Powered by GaadiDesk Watermark Stamp */}
+          <div className="pt-2.5 mt-2 border-t border-gray-100 flex items-center justify-between text-[8px] text-gray-400">
+            <div className="flex items-center space-x-1">
+              <img src="/gaadidesk_logo.png" alt="GaadiDesk" className="w-3.5 h-3.5 rounded-sm object-cover opacity-75" />
+              <span>Generated via <b>GaadiDesk by AGX</b> • Indian Fleet OS</span>
+            </div>
+            <span>Verified Computer Generated Bill</span>
           </div>
         </div>
 

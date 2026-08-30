@@ -22,8 +22,8 @@ export const WhatsAppModal = ({ data, onClose }) => {
   const b = data.booking || {};
   const c = data.customer || {};
 
-  let targetName = b.customerName || c.name || 'Client';
-  let targetPhone = b.customerPhone || c.phone || '';
+  let targetName = data.targetName || b.customerName || c.name || 'Client';
+  let targetPhone = data.targetPhone || b.customerPhone || c.phone || '';
 
   if (type === 'duty') {
     targetName = b.driverName || 'Driver';
@@ -31,6 +31,10 @@ export const WhatsAppModal = ({ data, onClose }) => {
   }
 
   const generateWhatsAppMessage = () => {
+    if (data.customMessage) {
+      return data.customMessage;
+    }
+
     if (type === 'duty') {
       return `*🚖 DRIVER DUTY SLIP - ${business.name.toUpperCase()}*\n\n` +
         `Hello *${b.driverName || 'Driver'}*,\n` +
@@ -126,10 +130,10 @@ export const WhatsAppModal = ({ data, onClose }) => {
             </div>
             <div>
               <h3 className="text-sm font-black text-[#111827]">
-                {type === 'duty' ? 'Driver Duty Slip' : type === 'reminder' ? 'Payment Reminder' : 'WhatsApp Slip'}
+                {data.title || (type === 'duty' ? 'Driver Duty Slip' : type === 'reminder' ? 'Payment Reminder' : 'WhatsApp Slip')}
               </h3>
               <p className="text-[11px] text-[#4B5563] font-semibold">
-                Send to {targetName} ({targetPhone || 'No phone'})
+                Send to {targetName} {targetPhone ? `(${targetPhone})` : ''}
               </p>
             </div>
           </div>

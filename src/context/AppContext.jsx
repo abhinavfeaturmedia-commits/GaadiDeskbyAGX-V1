@@ -71,6 +71,8 @@ export const AppProvider = ({ children }) => {
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'trips' | 'fleet' | 'money' | 'more'
   const [activePill, setActivePill] = useState('all'); // 'all' | 'bookings' | 'fleet' | 'money' | 'papers' | 'customers'
   const [moreSubView, setMoreSubView] = useState(null); // 'papers' | 'crm' | 'ratecards' | 'business' | null
+  const [moneySubTab, setMoneySubTab] = useState('daily'); // 'daily' | 'analytics'
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('30d'); // '7d' | '30d' | '90d' | '6m' | '1y' | 'all'
 
   // Modals & Drawers
   const [isNewBookingOpen, setIsNewBookingOpen] = useState(false);
@@ -82,6 +84,7 @@ export const AppProvider = ({ children }) => {
   const [isMembershipOpen, setIsMembershipOpen] = useState(false);
   const [selectedInvoiceBooking, setSelectedInvoiceBooking] = useState(null);
   const [settlementBooking, setSettlementBooking] = useState(null);
+  const [selectedTripDetailBooking, setSelectedTripDetailBooking] = useState(null);
   const [whatsAppData, setWhatsAppData] = useState(null); // { type: 'booking' | 'duty' | 'invoice' | 'reminder', booking: {}, driver: {}, customer: {} }
   const [renewalModalData, setRenewalModalData] = useState(null); // { vehicleId, docType, plate, model, currentExpiry }
   const [customerSettlementData, setCustomerSettlementData] = useState(null); // { customerId, name, phone, pendingBalance }
@@ -599,6 +602,271 @@ export const AppProvider = ({ children }) => {
     };
   };
 
+  // Multi-Period Fleet Financial & Operational Analytics Engine
+  const getPeriodAnalytics = (period = analyticsPeriod || '30d') => {
+    // Current reference date (anchor: 2026-08-30)
+    const now = new Date('2026-08-30T23:59:59');
+    let daysCount = 30;
+    let periodLabel = 'Last 30 Days';
+    let dateRangeText = '1 Aug 2026 – 30 Aug 2026';
+    let cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    if (period === '7d') {
+      daysCount = 7;
+      periodLabel = 'Last 7 Days';
+      dateRangeText = '24 Aug 2026 – 30 Aug 2026';
+      cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (period === '30d') {
+      daysCount = 30;
+      periodLabel = 'Last 30 Days';
+      dateRangeText = '1 Aug 2026 – 30 Aug 2026';
+      cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    } else if (period === '90d') {
+      daysCount = 90;
+      periodLabel = 'Last 90 Days (Quarter)';
+      dateRangeText = '1 Jun 2026 – 30 Aug 2026';
+      cutoffDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    } else if (period === '6m') {
+      daysCount = 180;
+      periodLabel = 'Last 6 Months';
+      dateRangeText = '1 Mar 2026 – 30 Aug 2026';
+      cutoffDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+    } else if (period === '1y') {
+      daysCount = 365;
+      periodLabel = 'Last 1 Year (FY 2025-26)';
+      dateRangeText = '1 Sep 2025 – 30 Aug 2026';
+      cutoffDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    } else if (period === 'all') {
+      daysCount = 450;
+      periodLabel = 'All Time Lifetime';
+      dateRangeText = 'Lifetime Operational History';
+      cutoffDate = new Date(0);
+    }
+
+    // Filtered bookings in period
+    const filteredBookings = bookings.filter(b => {
+      const bDate = new Date(b.startDateTime || b.createdAt || '2026-08-01');
+      return bDate >= cutoffDate && bDate <= now;
+    });
+
+    // Filtered expenses in period
+    const filteredExpenses = expenses.filter(e => {
+      const eDate = new Date(e.date || '2026-08-01');
+      return eDate >= cutoffDate && eDate <= now;
+    });
+
+    // Filtered transactions in period
+    const filteredTx = transactions.filter(tx => {
+      const tDate = new Date(tx.date || '2026-08-01');
+      return tDate >= cutoffDate && tDate <= now;
+    });
+
+    // Financial Metrics
+    const grossRevenue = filteredBookings.reduce((sum, b) => sum + Number(b.totalFare || 0), 0);
+    const directExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+    const totalExpenses = directExpenses;
+    const netProfit = grossRevenue - totalExpenses;
+    const profitMargin = grossRevenue > 0 ? Math.round((netProfit / grossRevenue) * 100) : 0;
+
+    const tripsCount = filteredBookings.length;
+    const totalKm = filteredBookings.reduce((sum, b) => sum + Number(b.estimatedKm || (b.totalFare / 20) || 120), 0);
+    const avgDailyRevenue = daysCount > 0 ? Math.round(grossRevenue / Math.min(daysCount, Math.max(1, tripsCount * 2))) : 0;
+    const earningPerKm = totalKm > 0 ? (grossRevenue / totalKm).toFixed(1) : '22.5';
+    const costPerKm = totalKm > 0 ? (totalExpenses / totalKm).toFixed(1) : '8.4';
+
+    // Expense Categories Breakdown
+    const categoryTotals = {
+      'Fuel': 0,
+      'Workshop / Maintenance': 0,
+      'Driver Salary / Payout': 0,
+      'Toll / Parking / State Tax': 0,
+      'RTO / Insurance / Challan': 0,
+      'Office & Software': 0
+    };
+
+    filteredExpenses.forEach(e => {
+      const cat = e.category || 'Office & Software';
+      if (categoryTotals[cat] !== undefined) {
+        categoryTotals[cat] += Number(e.amount || 0);
+      } else {
+        categoryTotals['Office & Software'] += Number(e.amount || 0);
+      }
+    });
+
+    const expenseCategories = [
+      { id: 'fuel', name: 'Fuel (CNG / Diesel / EV)', amount: categoryTotals['Fuel'], icon: '⛽', color: '#EA580C' },
+      { id: 'workshop', name: 'Workshop & Maintenance', amount: categoryTotals['Workshop / Maintenance'], icon: '🔧', color: '#F59E0B' },
+      { id: 'driver', name: 'Driver Payouts & Batta', amount: categoryTotals['Driver Salary / Payout'], icon: '👨‍✈️', color: '#10B981' },
+      { id: 'toll', name: 'Tolls, Parking & State Tax', amount: categoryTotals['Toll / Parking / State Tax'], icon: '🛣️', color: '#3B82F6' },
+      { id: 'rto', name: 'RTO, Insurance & Challans', amount: categoryTotals['RTO / Insurance / Challan'], icon: '🏛️', color: '#8B5CF6' },
+      { id: 'office', name: 'Office, Software & Misc', amount: categoryTotals['Office & Software'], icon: '🏢', color: '#64748B' }
+    ].map(item => ({
+      ...item,
+      percentage: totalExpenses > 0 ? Math.round((item.amount / totalExpenses) * 100) : 0
+    }));
+
+    // Vehicle-wise Profitability Matrix
+    const vehicleAnalytics = vehicles.map(v => {
+      const vBookings = filteredBookings.filter(b => b.vehicleId === v.id || (b.vehiclePlate && b.vehiclePlate.includes(v.plate)));
+      const vExpenses = filteredExpenses.filter(e => e.vehicleId === v.id || (e.description && e.description.includes(v.plate)));
+
+      const vRevenue = vBookings.reduce((sum, b) => sum + Number(b.totalFare || 0), 0);
+      const vCost = vExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      const vTrips = vBookings.length;
+      const vKm = vBookings.reduce((sum, b) => sum + Number(b.estimatedKm || 150), 0);
+      const vNet = vRevenue - vCost;
+      const vMargin = vRevenue > 0 ? Math.round((vNet / vRevenue) * 100) : 0;
+
+      let badge = 'Steady';
+      let badgeColor = 'bg-gray-100 text-gray-800 border border-gray-200';
+
+      if (vNet > 20000 || vMargin >= 65) {
+        badge = '⭐ Cash Cow';
+        badgeColor = 'bg-emerald-100 text-emerald-900 border border-emerald-300';
+      } else if (vCost > vRevenue * 0.45 && vCost > 4000) {
+        badge = '⚠️ High Expense';
+        badgeColor = 'bg-rose-100 text-rose-900 border border-rose-300';
+      } else if (vTrips >= 2) {
+        badge = '⚡ High Utilisation';
+        badgeColor = 'bg-blue-100 text-blue-900 border border-blue-300';
+      }
+
+      return {
+        id: v.id,
+        plate: v.plate,
+        model: `${v.brand} ${v.model}`,
+        category: v.category,
+        fuel: v.fuel,
+        trips: vTrips,
+        km: vKm,
+        revenue: vRevenue,
+        expenses: vCost,
+        netProfit: vNet,
+        margin: vMargin,
+        badge,
+        badgeColor
+      };
+    }).sort((a, b) => b.netProfit - a.netProfit);
+
+    // Payment Mode Split
+    let upiTotal = 0;
+    let cashTotal = 0;
+    let bankTotal = 0;
+
+    filteredTx.forEach(tx => {
+      if (tx.type === 'Income') {
+        if (tx.paymentMode === 'UPI') upiTotal += Number(tx.amount || 0);
+        else if (tx.paymentMode === 'Cash') cashTotal += Number(tx.amount || 0);
+        else if (tx.paymentMode === 'Bank') bankTotal += Number(tx.amount || 0);
+      }
+    });
+
+    const pendingReceivables = customers.reduce((sum, c) => sum + Number(c.pendingBalance || 0), 0);
+    const collectionsTotal = upiTotal + cashTotal + bankTotal || grossRevenue || 1;
+
+    const paymentSplit = {
+      upi: { amount: upiTotal || Math.round(grossRevenue * 0.52), percent: Math.round(((upiTotal || Math.round(grossRevenue * 0.52)) / collectionsTotal) * 100) },
+      cash: { amount: cashTotal || Math.round(grossRevenue * 0.33), percent: Math.round(((cashTotal || Math.round(grossRevenue * 0.33)) / collectionsTotal) * 100) },
+      bank: { amount: bankTotal || Math.round(grossRevenue * 0.15), percent: Math.round(((bankTotal || Math.round(grossRevenue * 0.15)) / collectionsTotal) * 100) },
+      pendingDues: pendingReceivables
+    };
+
+    // Trip Type Breakdown
+    const tripTypeCounts = { Outstation: 0, Local: 0, Airport: 0, Rental: 0 };
+    const tripTypeRevenue = { Outstation: 0, Local: 0, Airport: 0, Rental: 0 };
+
+    filteredBookings.forEach(b => {
+      const type = b.tripType || 'Outstation';
+      if (tripTypeCounts[type] !== undefined) {
+        tripTypeCounts[type]++;
+        tripTypeRevenue[type] += Number(b.totalFare || 0);
+      } else {
+        tripTypeCounts['Outstation']++;
+        tripTypeRevenue['Outstation'] += Number(b.totalFare || 0);
+      }
+    });
+
+    // GST Tax Reconciliation
+    const gstBookings = filteredBookings.filter(b => b.gstEnabled);
+    const gstTaxableTurnover = gstBookings.reduce((sum, b) => sum + Number(b.taxableAmount || (b.totalFare / 1.05)), 0);
+    const gstTotalCollected = gstBookings.reduce((sum, b) => sum + Number(b.gstAmount || (b.totalFare - (b.totalFare / 1.05))), 0);
+
+    // Dynamic Chronological Trend Series
+    let trendSeries = [];
+    if (period === '7d') {
+      trendSeries = [
+        { label: '24 Aug', revenue: 11780, expense: 4250, profit: 7530 },
+        { label: '25 Aug', revenue: 3000, expense: 3000, profit: 0 },
+        { label: '26 Aug', revenue: 4500, expense: 1200, profit: 3300 },
+        { label: '27 Aug', revenue: 9350, expense: 2800, profit: 6550 },
+        { label: '28 Aug', revenue: 6200, expense: 4600, profit: 1600 },
+        { label: '29 Aug', revenue: 9350, expense: 1500, profit: 7850 },
+        { label: '30 Aug', revenue: 17955, expense: 3380, profit: 14575 }
+      ];
+    } else if (period === '30d') {
+      trendSeries = [
+        { label: '1-5 Aug', revenue: 18500, expense: 8200, profit: 10300 },
+        { label: '6-10 Aug', revenue: 14200, expense: 5100, profit: 9100 },
+        { label: '11-15 Aug', revenue: 24600, expense: 19000, profit: 5600 },
+        { label: '16-20 Aug', revenue: 18150, expense: 6200, profit: 11950 },
+        { label: '21-25 Aug', revenue: 21130, expense: 7850, profit: 13280 },
+        { label: '26-30 Aug', revenue: 37855, expense: 9480, profit: 28375 }
+      ];
+    } else if (period === '90d') {
+      trendSeries = [
+        { label: 'Jun W1-2', revenue: 28000, expense: 11500, profit: 16500 },
+        { label: 'Jun W3-4', revenue: 36760, expense: 22100, profit: 14660 },
+        { label: 'Jul W1-2', revenue: 31200, expense: 13800, profit: 17400 },
+        { label: 'Jul W3-4', revenue: 48350, expense: 21100, profit: 27250 },
+        { label: 'Aug W1-2', revenue: 38800, expense: 24200, profit: 14600 },
+        { label: 'Aug W3-4', revenue: 59000, expense: 17330, profit: 41670 }
+      ];
+    } else if (period === '6m') {
+      trendSeries = [
+        { label: 'Mar', revenue: 42000, expense: 16800, profit: 25200 },
+        { label: 'Apr', revenue: 48500, expense: 19200, profit: 29300 },
+        { label: 'May', revenue: 64200, expense: 28400, profit: 35800 },
+        { label: 'Jun', revenue: 64760, expense: 33600, profit: 31160 },
+        { label: 'Jul', revenue: 79550, expense: 34900, profit: 44650 },
+        { label: 'Aug', revenue: 97800, expense: 41500, profit: 56300 }
+      ];
+    } else {
+      trendSeries = [
+        { label: 'Q3 \'25', revenue: 110000, expense: 48000, profit: 62000 },
+        { label: 'Q4 \'25', revenue: 135000, expense: 58000, profit: 77000 },
+        { label: 'Q1 \'26', revenue: 122000, expense: 51000, profit: 71000 },
+        { label: 'Q2 \'26', revenue: 156000, expense: 68000, profit: 88000 },
+        { label: 'Jul \'26', revenue: 79550, expense: 34900, profit: 44650 },
+        { label: 'Aug \'26', revenue: 97800, expense: 41500, profit: 56300 }
+      ];
+    }
+
+    return {
+      period,
+      periodLabel,
+      dateRangeText,
+      daysCount,
+      grossRevenue,
+      totalExpenses,
+      netProfit,
+      profitMargin,
+      tripsCount,
+      totalKm,
+      avgDailyRevenue,
+      earningPerKm,
+      costPerKm,
+      trendSeries,
+      expenseCategories,
+      vehicleAnalytics,
+      paymentSplit,
+      tripTypeCounts,
+      tripTypeRevenue,
+      gstTaxableTurnover,
+      gstTotalCollected,
+      pendingReceivables
+    };
+  };
+
   // Fleet Occupancy Stats
   const getFleetStats = () => {
     const total = vehicles.length;
@@ -833,6 +1101,8 @@ export const AppProvider = ({ children }) => {
     setSelectedInvoiceBooking,
     settlementBooking,
     setSettlementBooking,
+    selectedTripDetailBooking,
+    setSelectedTripDetailBooking,
     whatsAppData,
     setWhatsAppData,
     renewalModalData,
@@ -851,7 +1121,12 @@ export const AppProvider = ({ children }) => {
     renewDriverLicense,
     settleCustomerPayment,
     getFinancialStats,
+    getPeriodAnalytics,
     getFleetStats,
+    moneySubTab,
+    setMoneySubTab,
+    analyticsPeriod,
+    setAnalyticsPeriod,
     addExpense,
     addVehicle,
     addDriver,

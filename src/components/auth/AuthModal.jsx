@@ -205,13 +205,15 @@ export const AuthModal = () => {
 
         {/* Top Header Badge */}
         <div className="flex items-center justify-between pr-10 mb-4">
-          <div className="flex items-center space-x-2">
-            <div className="w-9 h-9 rounded-2xl bg-[#111827] flex items-center justify-center text-white font-black text-base shadow-sm">
-              G
-            </div>
+          <div className="flex items-center space-x-3">
+            <img
+              src="/gaadidesk_logo.png"
+              alt="GaadiDesk by AGX"
+              className="w-10 h-10 rounded-2xl object-cover shadow-sm ring-1 ring-black/5"
+            />
             <div>
               <div className="flex items-baseline space-x-1.5">
-                <span className="text-base font-black tracking-tight text-[#111827]">Gaadi<span className="text-[#EA580C]">Desk</span></span>
+                <span className="text-base font-black tracking-tight text-[#111827]">Gaadi<span className="text-[#22C55E]">Desk</span></span>
                 <span className="text-[10px] font-bold text-[#4B5563]">by AGX</span>
               </div>
               <span className="text-[11px] block text-[#4B5563] font-bold">Fleet & Cab Office</span>

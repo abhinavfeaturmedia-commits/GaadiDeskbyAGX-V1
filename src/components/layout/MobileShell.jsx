@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Home,
@@ -8,11 +8,7 @@ import {
   Menu,
   Bell,
   Languages,
-  Plus,
-  Zap,
-  Award,
-  Music,
-  User
+  Plus
 } from 'lucide-react';
 
 export const MobileShell = ({ children }) => {
@@ -29,41 +25,13 @@ export const MobileShell = ({ children }) => {
     setIsMembershipOpen
   } = useApp();
 
-  const [currentTime, setCurrentTime] = useState('');
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
   const alerts = getDocumentAlerts();
   const urgentAlertsCount = alerts.filter(a => a.isUrgent || a.isExpired).length;
 
   return (
     <div className="phone-shell font-sans text-text-primary bg-canvas selection:bg-accent-peach selection:text-white">
-      {/* Top Mobile Status Bar (Matching Reference Screen Top) */}
-      <div className="pt-3 px-6 pb-1 flex items-center justify-between text-xs font-bold text-[#1E232A] select-none">
-        <span className="tracking-tight">{currentTime || '9:41'}</span>
-        {/* Dynamic Island Pill */}
-        <div className="h-5 w-28 bg-[#1E232A] rounded-full mx-auto flex items-center justify-center space-x-1.5 px-2 shadow-xs">
-          <div className="w-1.5 h-1.5 rounded-full bg-accent-lime animate-pulse"></div>
-          <span className="text-[10px] font-semibold text-white/90 tracking-wide">GaadiDesk <span className="text-[8px] text-white/60 font-normal">by AGX</span></span>
-        </div>
-        <div className="flex items-center space-x-1.5 text-xs text-gray-800">
-          <span className="text-[10px] font-extrabold">5G</span>
-          <div className="w-5 h-2.5 border border-gray-800 rounded-xs p-0.5 flex items-center">
-            <div className="h-full bg-gray-900 rounded-2xs w-4"></div>
-          </div>
-        </div>
-      </div>
-
-      {/* App Header Bar (Matching Reference Screen 1 & 3: Avatar + Good Morning + Notification) */}
-      <div className="px-5 py-2.5 flex items-center justify-between">
+      {/* App Header Bar (Avatar + Good Morning + Language/Notification Controls) */}
+      <div className="px-5 pt-4 pb-2.5 flex items-center justify-between">
         {/* Left: Avatar & Friendly Greeting */}
         <div className="flex items-center space-x-3">
           <div

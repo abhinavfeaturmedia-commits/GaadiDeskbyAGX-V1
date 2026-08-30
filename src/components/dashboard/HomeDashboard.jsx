@@ -42,6 +42,7 @@ export const HomeDashboard = () => {
     setIsNotificationsOpen,
     setSelectedInvoiceBooking,
     setSettlementBooking,
+    setSelectedTripDetailBooking,
     formatCurrency
   } = useApp();
 
@@ -334,7 +335,10 @@ export const HomeDashboard = () => {
 
       {/* 6. Active Trip Spotlight */}
       {ongoingTrip && (
-        <div className="bg-white rounded-3xl p-4 border-2 border-emerald-400 shadow-xs space-y-3 stagger-3">
+        <div
+          onClick={() => setSelectedTripDetailBooking(ongoingTrip)}
+          className="bg-white rounded-3xl p-4 border-2 border-emerald-400 hover:border-emerald-600 shadow-xs space-y-3 stagger-3 cursor-pointer transition-all tap-active group relative"
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
@@ -342,15 +346,25 @@ export const HomeDashboard = () => {
                 {ongoingTrip.status === 'Ongoing' ? 'Active Trip On-Road' : 'Next Scheduled Dispatch'}
               </span>
             </div>
-            <span className="text-[10px] font-black bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-              {ongoingTrip.tripType}
-            </span>
+            <div className="flex items-center space-x-1.5">
+              <span className="text-[10px] font-black bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                {ongoingTrip.tripType}
+              </span>
+              <span className="text-[10px] text-emerald-700 font-bold hidden sm:inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                Details ›
+              </span>
+            </div>
           </div>
 
           <div>
-            <h4 className="text-sm font-black text-[#111827]">
-              {ongoingTrip.customerName}
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-black text-[#111827] group-hover:text-emerald-900 transition-colors">
+                {ongoingTrip.customerName}
+              </h4>
+              <span className="text-[10px] font-bold text-gray-400 group-hover:text-gray-700 transition-colors">
+                Tap for more info ➔
+              </span>
+            </div>
             <p className="text-xs text-[#374151] font-bold flex items-center gap-1 mt-0.5 truncate">
               <span>📍 {ongoingTrip.pickupLocation}</span>
               <span>➔</span>
@@ -358,7 +372,7 @@ export const HomeDashboard = () => {
             </p>
           </div>
 
-          <div className="bg-[#F8F6F0] rounded-2xl p-2.5 border border-[#E5DFD3] flex items-center justify-between text-xs">
+          <div className="bg-[#F8F6F0] rounded-2xl p-2.5 border border-[#E5DFD3] flex items-center justify-between text-xs group-hover:bg-[#f3efe6] transition-colors">
             <div>
               <p className="font-bold text-[#111827]">🚗 {ongoingTrip.vehiclePlate}</p>
               <p className="text-[11px] text-[#4B5563] font-semibold">Driver: {ongoingTrip.driverName}</p>
@@ -372,7 +386,10 @@ export const HomeDashboard = () => {
           <div className="flex items-center space-x-2 pt-1">
             {ongoingTrip.status === 'Ongoing' ? (
               <button
-                onClick={() => setSettlementBooking(ongoingTrip)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSettlementBooking(ongoingTrip);
+                }}
                 className="flex-1 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs tap-active"
               >
                 <Gauge className="w-4 h-4" />
@@ -380,7 +397,10 @@ export const HomeDashboard = () => {
               </button>
             ) : (
               <button
-                onClick={() => setActiveTab('trips')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveTab('trips');
+                }}
                 className="flex-1 py-2 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs tap-active"
               >
                 <Navigation className="w-4 h-4 text-[#D4F05B]" />
@@ -389,7 +409,10 @@ export const HomeDashboard = () => {
             )}
 
             <button
-              onClick={() => setSelectedInvoiceBooking(ongoingTrip)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedInvoiceBooking(ongoingTrip);
+              }}
               className="px-3.5 py-2 rounded-full bg-white border-2 border-[#E5DFD3] text-[#111827] text-xs font-black flex items-center gap-1 hover:bg-gray-50 tap-active shadow-xs"
             >
               <span>Bill</span>

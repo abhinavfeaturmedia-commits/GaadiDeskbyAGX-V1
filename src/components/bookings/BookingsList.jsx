@@ -31,6 +31,7 @@ export const BookingsList = () => {
     startTrip,
     setSettlementBooking,
     setSelectedInvoiceBooking,
+    setSelectedTripDetailBooking,
     setWhatsAppData,
     formatCurrency
   } = useApp();
@@ -126,8 +127,9 @@ export const BookingsList = () => {
             return (
               <div
                 key={b.id}
-                className={`bg-white rounded-3xl p-4 border-2 transition-all shadow-xs space-y-3 ${
-                  isOngoing ? 'border-emerald-400 ring-2 ring-emerald-100' : 'border-[#E5DFD3]'
+                onClick={() => setSelectedTripDetailBooking(b)}
+                className={`bg-white rounded-3xl p-4 border-2 transition-all shadow-xs space-y-3 cursor-pointer hover:border-[#111827] tap-active group ${
+                  isOngoing ? 'border-emerald-400 ring-2 ring-emerald-100 hover:border-emerald-600' : 'border-[#E5DFD3]'
                 }`}
               >
                 {/* Trip Header Row */}
@@ -149,9 +151,12 @@ export const BookingsList = () => {
                     </span>
                   </div>
 
-                  <span className="text-[10px] font-black text-[#111827] bg-[#F8F6F0] px-2.5 py-0.5 rounded-full border border-[#E5DFD3]">
-                    {b.tripType}
-                  </span>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-[10px] font-black text-[#111827] bg-[#F8F6F0] px-2.5 py-0.5 rounded-full border border-[#E5DFD3]">
+                      {b.tripType}
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#111827] transition-colors" />
+                  </div>
                 </div>
 
                 {/* Customer & Route */}
@@ -173,7 +178,7 @@ export const BookingsList = () => {
                 </div>
 
                 {/* Vehicle & Driver Details */}
-                <div className="bg-[#F8F6F0] rounded-2xl p-2.5 border border-[#E5DFD3] flex items-center justify-between text-xs">
+                <div className="bg-[#F8F6F0] rounded-2xl p-2.5 border border-[#E5DFD3] flex items-center justify-between text-xs group-hover:bg-[#f3efe6] transition-colors">
                   <div className="space-y-0.5">
                     <p className="font-bold text-[#111827]">🚗 {b.vehiclePlate || 'Car Unassigned'}</p>
                     <p className="text-[11px] text-[#4B5563] font-semibold">
@@ -194,7 +199,10 @@ export const BookingsList = () => {
                 <div className="flex items-center space-x-1.5 pt-1">
                   {/* WhatsApp Customer Confirmation */}
                   <button
-                    onClick={() => setWhatsAppData({ type: 'booking', booking: b })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setWhatsAppData({ type: 'booking', booking: b });
+                    }}
                     className="flex-1 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black flex items-center justify-center gap-1 shadow-xs tap-active"
                     title="Send Booking Confirmation to Customer"
                   >
@@ -205,7 +213,10 @@ export const BookingsList = () => {
                   {/* WhatsApp Driver Duty Card */}
                   {b.driverPhone && (
                     <button
-                      onClick={() => setWhatsAppData({ type: 'duty', booking: b })}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setWhatsAppData({ type: 'duty', booking: b });
+                      }}
                       className="py-1.5 px-2.5 rounded-full bg-[#111827] hover:bg-black text-white text-[11px] font-black flex items-center justify-center gap-1 shadow-xs tap-active"
                       title="Send Duty Card to Driver"
                     >
@@ -217,7 +228,8 @@ export const BookingsList = () => {
                   {/* Lifecycle Action (Start Trip / End & Settle Trip) */}
                   {isConfirmed ? (
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         const veh = vehicles.find(v => v.id === b.vehicleId);
                         setStartKmInput(veh?.odometer || 64000);
                         setStartTripModal(b);
@@ -229,7 +241,10 @@ export const BookingsList = () => {
                     </button>
                   ) : isOngoing ? (
                     <button
-                      onClick={() => setSettlementBooking(b)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSettlementBooking(b);
+                      }}
                       className="px-3 py-1.5 rounded-full bg-emerald-600 text-white text-[11px] font-black flex items-center gap-1 shadow-xs tap-active hover:bg-emerald-700"
                     >
                       <Gauge className="w-3 h-3" />
@@ -239,7 +254,10 @@ export const BookingsList = () => {
 
                   {/* Tax Invoice Modal */}
                   <button
-                    onClick={() => setSelectedInvoiceBooking(b)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedInvoiceBooking(b);
+                    }}
                     className="p-1.5 px-2.5 rounded-full bg-white border-2 border-[#E5DFD3] text-[#111827] text-[11px] font-black flex items-center gap-1 hover:bg-gray-50 tap-active shadow-xs"
                     title="Generate GST Invoice"
                   >

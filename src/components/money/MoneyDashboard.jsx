@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { MoneyAnalytics } from './MoneyAnalytics';
 import {
   Wallet,
   ArrowUpRight,
@@ -16,7 +17,8 @@ import {
   UserCheck,
   MessageCircle,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  BarChart3
 } from 'lucide-react';
 
 export const MoneyDashboard = () => {
@@ -32,7 +34,9 @@ export const MoneyDashboard = () => {
     isNewExpenseOpen,
     setIsNewExpenseOpen,
     setCustomerSettlementData,
-    setWhatsAppData
+    setWhatsAppData,
+    moneySubTab,
+    setMoneySubTab
   } = useApp();
 
   const financialStats = getFinancialStats();
@@ -72,7 +76,9 @@ export const MoneyDashboard = () => {
         <div>
           <h2 className="text-xl font-black text-[#111827]">{t('tileMoney')}</h2>
           <p className="text-xs text-[#4B5563] font-semibold">
-            Today's collections, expenses & pending ledger
+            {moneySubTab === 'analytics'
+              ? 'Multi-period P&L, expense leaks & vehicle ROI'
+              : "Today's collections, expenses & pending ledger"}
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -93,14 +99,44 @@ export const MoneyDashboard = () => {
         </div>
       </div>
 
-      {/* Hero Financial Card */}
-      <div className="bg-[#111827] rounded-3xl p-5 text-white shadow-md space-y-4 border border-gray-800">
-        <div className="flex items-center justify-between text-xs text-gray-300">
-          <span className="font-bold">{t('netProfit')}</span>
-          <span className="bg-[#D4F05B] text-[#111827] font-black px-2.5 py-0.5 rounded-full text-[10px] shadow-xs">
-            TODAY'S CASHFLOW
-          </span>
-        </div>
+      {/* Sub-Navigation Segmented Switcher */}
+      <div className="flex bg-gray-100 p-1 rounded-full border border-[#E5DFD3] shadow-xs">
+        <button
+          onClick={() => setMoneySubTab('daily')}
+          className={`flex-1 py-2 rounded-full text-xs font-black transition-all tap-active flex items-center justify-center space-x-1.5 ${
+            moneySubTab === 'daily'
+              ? 'bg-[#111827] text-white shadow-xs'
+              : 'text-[#4B5563] hover:text-[#111827]'
+          }`}
+        >
+          <span>💵 Today's Cashflow</span>
+        </button>
+        <button
+          onClick={() => setMoneySubTab('analytics')}
+          className={`flex-1 py-2 rounded-full text-xs font-black transition-all tap-active flex items-center justify-center space-x-1.5 ${
+            moneySubTab === 'analytics'
+              ? 'bg-[#111827] text-white shadow-xs'
+              : 'text-[#4B5563] hover:text-[#111827]'
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          <span>📊 Money Analytics</span>
+        </button>
+      </div>
+
+      {/* RENDER ANALYTICS SUBPAGE */}
+      {moneySubTab === 'analytics' ? (
+        <MoneyAnalytics />
+      ) : (
+        <>
+          {/* Hero Financial Card */}
+          <div className="bg-[#111827] rounded-3xl p-5 text-white shadow-md space-y-4 border border-gray-800">
+            <div className="flex items-center justify-between text-xs text-gray-300">
+              <span className="font-bold">{t('netProfit')}</span>
+              <span className="bg-[#D4F05B] text-[#111827] font-black px-2.5 py-0.5 rounded-full text-[10px] shadow-xs">
+                TODAY'S CASHFLOW
+              </span>
+            </div>
 
         <div>
           <h3 className="text-3xl font-black text-white tracking-tight">
@@ -243,6 +279,8 @@ export const MoneyDashboard = () => {
           })}
         </div>
       </div>
+    </>
+  )}
 
       {/* New Expense Modal */}
       {isNewExpenseOpen && (

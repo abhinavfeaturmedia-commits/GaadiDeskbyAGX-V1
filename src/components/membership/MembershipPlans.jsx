@@ -95,10 +95,12 @@ export const MembershipPlans = ({ onClose }) => {
       <div className="bg-[#FBF8F2] rounded-4xl max-w-[430px] w-full max-h-[92vh] flex flex-col shadow-2xl border border-card-border overflow-hidden">
         {/* Header */}
         <div className="bg-white px-5 py-4 border-b border-card-border flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-full bg-accent-amber/20 flex items-center justify-center text-accent-amber font-bold">
-              <Crown className="w-4 h-4" />
-            </div>
+          <div className="flex items-center space-x-3">
+            <img
+              src="/gaadidesk_logo.png"
+              alt="GaadiDesk Logo"
+              className="w-9 h-9 rounded-2xl object-cover shadow-xs ring-1 ring-black/5"
+            />
             <div>
               <h3 className="text-sm font-extrabold text-gray-900">{t('membershipTitle')}</h3>
               <p className="text-[11px] text-text-secondary">Official B2B SaaS Plans</p>
