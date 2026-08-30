@@ -1,0 +1,12 @@
+{
+  "appId": "com.gaadidesk.app",
+  "appName": "GaadiDesk",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
