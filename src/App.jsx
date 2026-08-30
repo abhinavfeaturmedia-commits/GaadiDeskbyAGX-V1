@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { SplashScreen } from './components/splash/SplashScreen';
 import { MobileShell } from './components/layout/MobileShell';
 import { HomeDashboard } from './components/dashboard/HomeDashboard';
 import { BookingsList } from './components/bookings/BookingsList';
@@ -19,6 +20,7 @@ import { LandingPage } from './components/landing/LandingPage';
 import { AuthModal } from './components/auth/AuthModal';
 
 const MainContent = () => {
+  const [showSplash, setShowSplash] = useState(true);
   const {
     authUser,
     activeTab,
@@ -38,83 +40,87 @@ const MainContent = () => {
     setWhatsAppData
   } = useApp();
 
-  // If user is not logged in, show the Public Landing / Home Page
-  if (!authUser) {
-    return (
-      <>
-        <LandingPage />
-        <AuthModal />
-        {isMembershipOpen && (
-          <MembershipPlans onClose={() => setIsMembershipOpen(false)} />
-        )}
-      </>
-    );
-  }
-
-  // If user is logged in, show the full GaadiDesk App Shell & Dashboard
   return (
-    <MobileShell>
-      {/* Tab Router */}
-      {activeTab === 'home' && <HomeDashboard />}
-      {activeTab === 'trips' && <BookingsList />}
-      {activeTab === 'fleet' && <FleetManager />}
-      {activeTab === 'money' && <MoneyDashboard />}
-      {activeTab === 'more' && <MoreMenu />}
-
-      {/* Global Modals & Drawers */}
-      {isNewBookingOpen && (
-        <NewBookingWizard onClose={() => setIsNewBookingOpen(false)} />
+    <>
+      {showSplash && (
+        <SplashScreen onFinish={() => setShowSplash(false)} duration={1800} />
       )}
 
-      {selectedTripDetailBooking && (
-        <TripDetailModal
-          booking={selectedTripDetailBooking}
-          onClose={() => setSelectedTripDetailBooking(null)}
-        />
+      {/* If user is not logged in, show the Public Landing / Home Page */}
+      {!authUser ? (
+        <>
+          <LandingPage />
+          <AuthModal />
+          {isMembershipOpen && (
+            <MembershipPlans onClose={() => setIsMembershipOpen(false)} />
+          )}
+        </>
+      ) : (
+        /* If user is logged in, show the full GaadiDesk App Shell & Dashboard */
+        <MobileShell>
+          {/* Tab Router */}
+          {activeTab === 'home' && <HomeDashboard />}
+          {activeTab === 'trips' && <BookingsList />}
+          {activeTab === 'fleet' && <FleetManager />}
+          {activeTab === 'money' && <MoneyDashboard />}
+          {activeTab === 'more' && <MoreMenu />}
+
+          {/* Global Modals & Drawers */}
+          {isNewBookingOpen && (
+            <NewBookingWizard onClose={() => setIsNewBookingOpen(false)} />
+          )}
+
+          {selectedTripDetailBooking && (
+            <TripDetailModal
+              booking={selectedTripDetailBooking}
+              onClose={() => setSelectedTripDetailBooking(null)}
+            />
+          )}
+
+          {settlementBooking && (
+            <TripSettlementModal
+              booking={settlementBooking}
+              onClose={() => setSettlementBooking(null)}
+            />
+          )}
+
+          {selectedInvoiceBooking && (
+            <InvoiceGenerator
+              booking={selectedInvoiceBooking}
+              onClose={() => setSelectedInvoiceBooking(null)}
+            />
+          )}
+
+          {whatsAppData && (
+            <WhatsAppModal
+              data={whatsAppData}
+              onClose={() => setWhatsAppData(null)}
+            />
+          )}
+
+          {isNotificationsOpen && (
+            <NotificationModal
+              onClose={() => setIsNotificationsOpen(false)}
+            />
+          )}
+
+          {isMembershipOpen && (
+            <MembershipPlans
+              onClose={() => setIsMembershipOpen(false)}
+            />
+          )}
+
+          {/* RTO Document Renewal Modal */}
+          <RenewalModal />
+
+          {/* Customer Dues Settlement Modal */}
+          <CustomerSettleModal />
+
+          {/* Global Auth Modal */}
+          <AuthModal />
+        </MobileShell>
       )}
-
-      {settlementBooking && (
-        <TripSettlementModal
-          booking={settlementBooking}
-          onClose={() => setSettlementBooking(null)}
-        />
-      )}
-
-      {selectedInvoiceBooking && (
-        <InvoiceGenerator
-          booking={selectedInvoiceBooking}
-          onClose={() => setSelectedInvoiceBooking(null)}
-        />
-      )}
-
-      {whatsAppData && (
-        <WhatsAppModal
-          data={whatsAppData}
-          onClose={() => setWhatsAppData(null)}
-        />
-      )}
-
-      {isNotificationsOpen && (
-        <NotificationModal
-          onClose={() => setIsNotificationsOpen(false)}
-        />
-      )}
-
-      {isMembershipOpen && (
-        <MembershipPlans
-          onClose={() => setIsMembershipOpen(false)}
-        />
-      )}
-
-      {/* RTO Document Renewal Modal */}
-      <RenewalModal />
-
-      {/* Customer Dues Settlement Modal */}
-      <CustomerSettleModal />
-
-      {/* Global Auth Modal */}
-      <AuthModal />
-    </MobileShell>
+    </>
   );
 };
 

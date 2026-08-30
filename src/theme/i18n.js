@@ -7,7 +7,7 @@ export const translations = {
     greetingMorning: "Good morning",
     greetingAfternoon: "Good afternoon",
     greetingEvening: "Good evening",
-    headerTitle: "Balance Your Fleet and Business",
+    headerTitle: "Ready for Today's Trips?",
     
     // Bottom Nav
     navHome: "Home",
@@ -179,7 +179,7 @@ export const translations = {
     greetingMorning: "शुभ प्रभात",
     greetingAfternoon: "नमस्ते",
     greetingEvening: "शुभ संध्या",
-    headerTitle: "गाड़ी और धंधा रखें बिल्कुल कंट्रोल में",
+    headerTitle: "आज की ट्रिप्स के लिए तैयार?",
     
     // Bottom Nav
     navHome: "होम",
