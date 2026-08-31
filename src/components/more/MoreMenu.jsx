@@ -30,11 +30,11 @@ export const MoreMenu = () => {
   const {
     t,
     business,
-    setBusiness,
+    updateBusiness,
     language,
     toggleLanguage,
     rateCards,
-    setRateCards,
+    updateRateCard,
     setIsMembershipOpen,
     formatCurrency,
     formatPhoneNumber,
@@ -68,14 +68,16 @@ export const MoreMenu = () => {
 
   const handleBizSave = (e) => {
     e.preventDefault();
-    setBusiness(bizForm);
+    updateBusiness(bizForm);
     alert("Business profile details updated successfully!");
     handleSubViewChange(null);
   };
 
   const handleRateCardSave = (e) => {
     e.preventDefault();
-    setRateCards(prev => prev.map(rc => rc.id === editingRateCard.id ? editingRateCard : rc));
+    if (editingRateCard) {
+      updateRateCard(editingRateCard);
+    }
     setEditingRateCard(null);
   };
 

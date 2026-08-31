@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   initialBusiness,
   initialVehicles,
@@ -10,10 +10,17 @@ import {
   initialTransactions
 } from '../data/seedData';
 import { translations } from '../theme/i18n';
+import { supabase, checkSupabaseHealth } from '../lib/supabase';
+import { supabaseApi } from '../services/supabaseApi';
 
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
+  // Cloud Sync & Supabase Backend State
+  const [isCloudConnected, setIsCloudConnected] = useState(false);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState('syncing'); // 'synced' | 'syncing' | 'offline' | 'error'
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+
   // Authentication State (stored in localStorage)
   const [authUser, setAuthUser] = useState(() => {
     const saved = localStorage.getItem('gd_auth_user');
@@ -157,6 +164,65 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('gd_transactions', JSON.stringify(transactions));
   }, [transactions]);
+
+  // ============================================================================
+  // SUPABASE CLOUD HYDRATION & BIDIRECTIONAL SYNC ENGINE
+  // ============================================================================
+  const syncWithCloud = useCallback(async (manual = false) => {
+    try {
+      if (manual) setCloudSyncStatus('syncing');
+      const health = await checkSupabaseHealth();
+      if (!health.isConnected) {
+        setIsCloudConnected(false);
+        setCloudSyncStatus('offline');
+        return false;
+      }
+
+      setIsCloudConnected(true);
+      const businessId = business?.id || 'biz-001';
+      const cloudData = await supabaseApi.fetchFullBusinessData(businessId);
+
+      if (cloudData.isLoaded) {
+        if (cloudData.business) setBusiness(cloudData.business);
+        if (cloudData.vehicles?.length) setVehicles(cloudData.vehicles);
+        if (cloudData.drivers?.length) setDrivers(cloudData.drivers);
+        if (cloudData.customers?.length) setCustomers(cloudData.customers);
+        if (cloudData.rateCards?.length) setRateCards(cloudData.rateCards);
+        if (cloudData.bookings?.length) setBookings(cloudData.bookings);
+        if (cloudData.expenses?.length) setExpenses(cloudData.expenses);
+        if (cloudData.transactions?.length) setTransactions(cloudData.transactions);
+
+        setCloudSyncStatus('synced');
+        setLastSyncedAt(new Date());
+        return true;
+      }
+    } catch (err) {
+      console.warn('[AppContext] Sync with Supabase cloud failed:', err);
+      setCloudSyncStatus('offline');
+      return false;
+    }
+  }, [business?.id]);
+
+  useEffect(() => {
+    let isMounted = true;
+    syncWithCloud();
+
+    // Setup Supabase Realtime channel for live multi-user / driver sync
+    const channel = supabase.channel('gaadidesk_realtime_db')
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+        console.log('[Supabase Live Change Detected]:', payload.table, payload.eventType);
+        if (isMounted) {
+          syncWithCloud();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [syncWithCloud]);
+
 
   // Translation Helper
   const t = (key, params = {}) => {
@@ -543,6 +609,12 @@ export const AppProvider = ({ children }) => {
     };
 
     setTransactions(prev => [newTx, ...prev]);
+
+    // Persist to Supabase Cloud
+    supabaseApi.saveTransaction(newTx, business?.id || 'biz-001')
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Sync Tx Error]:', err));
+
     return newTx;
   };
 
@@ -569,6 +641,11 @@ export const AppProvider = ({ children }) => {
       }
       return [newBooking, ...prev];
     });
+
+    // Persist to Supabase Cloud
+    supabaseApi.saveBooking(newBooking, business?.id || 'biz-001')
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Sync Booking Error]:', err));
 
     // Record Advance payment transaction if brand new or if advance was modified
     if (Number(bookingData.advancePaid) > 0) {
@@ -615,17 +692,14 @@ export const AppProvider = ({ children }) => {
         const deltaPending = newPending - oldPending;
 
         if (match) {
-          return prev.map(c => {
-            if (c.id === match.id) {
-              return {
-                ...c,
-                totalBookings: (c.totalBookings || 0) + (existingBooking ? 0 : 1),
-                pendingBalance: Math.max(0, (c.pendingBalance || 0) + deltaPending),
-                address: bookingData.pickupLocation || c.address
-              };
-            }
-            return c;
-          });
+          const updatedCust = {
+            ...match,
+            totalBookings: (match.totalBookings || 0) + (existingBooking ? 0 : 1),
+            pendingBalance: Math.max(0, (match.pendingBalance || 0) + deltaPending),
+            address: bookingData.pickupLocation || match.address
+          };
+          supabaseApi.saveCustomer(updatedCust, business?.id || 'biz-001').catch(() => {});
+          return prev.map(c => c.id === match.id ? updatedCust : c);
         } else {
           // Auto create customer in CRM
           const newCust = {
@@ -637,6 +711,7 @@ export const AppProvider = ({ children }) => {
             pendingBalance: Math.max(0, Number(bookingData.balancePending || 0)),
             address: bookingData.pickupLocation || ''
           };
+          supabaseApi.saveCustomer(newCust, business?.id || 'biz-001').catch(() => {});
           return [newCust, ...prev];
         }
       });
@@ -645,10 +720,24 @@ export const AppProvider = ({ children }) => {
     // Update Vehicle & Driver Status if Ongoing
     if (newBooking.status === 'Ongoing' || newBooking.status === 'Driver Assigned') {
       if (newBooking.vehicleId) {
-        setVehicles(prev => prev.map(v => v.id === newBooking.vehicleId ? { ...v, status: 'On Trip' } : v));
+        setVehicles(prev => prev.map(v => {
+          if (v.id === newBooking.vehicleId) {
+            const updatedV = { ...v, status: 'On Trip' };
+            supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+            return updatedV;
+          }
+          return v;
+        }));
       }
       if (newBooking.driverId) {
-        setDrivers(prev => prev.map(d => d.id === newBooking.driverId ? { ...d, status: 'On Trip' } : d));
+        setDrivers(prev => prev.map(d => {
+          if (d.id === newBooking.driverId) {
+            const updatedD = { ...d, status: 'On Trip' };
+            supabaseApi.saveDriver(updatedD, business?.id || 'biz-001').catch(() => {});
+            return updatedD;
+          }
+          return d;
+        }));
       }
     }
 
@@ -657,23 +746,42 @@ export const AppProvider = ({ children }) => {
 
   // Start Trip action: transitions trip to Ongoing, marks vehicle & driver On Trip
   const startTrip = (bookingId, startKm = null) => {
+    let updatedBooking = null;
     setBookings(prev => prev.map(b => {
       if (b.id !== bookingId) return b;
-      return {
+      updatedBooking = {
         ...b,
         status: 'Ongoing',
         actualStartDateTime: new Date().toISOString(),
         startKm: startKm || (vehicles.find(v => v.id === b.vehicleId)?.odometer || 0)
       };
+      return updatedBooking;
     }));
 
     const targetBooking = bookings.find(b => b.id === bookingId);
     if (targetBooking) {
+      if (updatedBooking) {
+        supabaseApi.saveBooking(updatedBooking, business?.id || 'biz-001').catch(() => {});
+      }
       if (targetBooking.vehicleId) {
-        setVehicles(prev => prev.map(v => v.id === targetBooking.vehicleId ? { ...v, status: 'On Trip' } : v));
+        setVehicles(prev => prev.map(v => {
+          if (v.id === targetBooking.vehicleId) {
+            const updatedV = { ...v, status: 'On Trip' };
+            supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+            return updatedV;
+          }
+          return v;
+        }));
       }
       if (targetBooking.driverId) {
-        setDrivers(prev => prev.map(d => d.id === targetBooking.driverId ? { ...d, status: 'On Trip' } : d));
+        setDrivers(prev => prev.map(d => {
+          if (d.id === targetBooking.driverId) {
+            const updatedD = { ...d, status: 'On Trip' };
+            supabaseApi.saveDriver(updatedD, business?.id || 'biz-001').catch(() => {});
+            return updatedD;
+          }
+          return d;
+        }));
       }
     }
   };
@@ -733,15 +841,20 @@ export const AppProvider = ({ children }) => {
 
     setBookings(prev => prev.map(b => b.id === bookingId ? updatedBooking : b));
 
+    // Persist completed booking to Supabase
+    supabaseApi.saveBooking(updatedBooking, business?.id || 'biz-001').catch(() => {});
+
     // 2. Free Vehicle & Update Odometer
     if (targetBooking.vehicleId) {
       setVehicles(prev => prev.map(v => {
         if (v.id === targetBooking.vehicleId) {
-          return {
+          const updatedV = {
             ...v,
             status: 'Free',
             odometer: endKm ? Number(endKm) : v.odometer
           };
+          supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+          return updatedV;
         }
         return v;
       }));
@@ -749,7 +862,14 @@ export const AppProvider = ({ children }) => {
 
     // 3. Free Driver
     if (targetBooking.driverId) {
-      setDrivers(prev => prev.map(d => d.id === targetBooking.driverId ? { ...d, status: 'Available' } : d));
+      setDrivers(prev => prev.map(d => {
+        if (d.id === targetBooking.driverId) {
+          const updatedD = { ...d, status: 'Available' };
+          supabaseApi.saveDriver(updatedD, business?.id || 'biz-001').catch(() => {});
+          return updatedD;
+        }
+        return d;
+      }));
     }
 
     // 4. Record Settlement Payment in Transaction Ledger
@@ -773,10 +893,12 @@ export const AppProvider = ({ children }) => {
 
     setCustomers(prev => prev.map(c => {
       if (c.name.toLowerCase() === targetBooking.customerName.toLowerCase() || c.phone === targetBooking.customerPhone) {
-        return {
+        const updatedCust = {
           ...c,
           pendingBalance: Math.max(0, (c.pendingBalance || 0) + balanceDelta)
         };
+        supabaseApi.saveCustomer(updatedCust, business?.id || 'biz-001').catch(() => {});
+        return updatedCust;
       }
       return c;
     }));
@@ -789,31 +911,45 @@ export const AppProvider = ({ children }) => {
     const targetBooking = bookings.find(b => b.id === bookingId);
     if (!targetBooking) return;
 
-    setBookings(prev => {
-      return prev.map(b => {
-        if (b.id !== bookingId) return b;
-        return { ...b, status: newStatus, ...extraData };
-      });
-    });
+    const updatedBooking = { ...targetBooking, status: newStatus, ...extraData };
+    setBookings(prev => prev.map(b => b.id === bookingId ? updatedBooking : b));
+
+    supabaseApi.saveBooking(updatedBooking, business?.id || 'biz-001').catch(() => {});
 
     if (newStatus === 'Completed' || newStatus === 'Cancelled') {
       // Free Vehicle
       if (targetBooking.vehicleId) {
-        setVehicles(vPrev => vPrev.map(v => v.id === targetBooking.vehicleId ? { ...v, status: 'Free' } : v));
+        setVehicles(vPrev => vPrev.map(v => {
+          if (v.id === targetBooking.vehicleId) {
+            const updatedV = { ...v, status: 'Free' };
+            supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+            return updatedV;
+          }
+          return v;
+        }));
       }
       // Free Driver
       if (targetBooking.driverId) {
-        setDrivers(dPrev => dPrev.map(d => d.id === targetBooking.driverId ? { ...d, status: 'Available' } : d));
+        setDrivers(dPrev => dPrev.map(d => {
+          if (d.id === targetBooking.driverId) {
+            const updatedD = { ...d, status: 'Available' };
+            supabaseApi.saveDriver(updatedD, business?.id || 'biz-001').catch(() => {});
+            return updatedD;
+          }
+          return d;
+        }));
       }
 
       // If Cancelled, reverse any customer pending dues in CRM
       if (newStatus === 'Cancelled' && Number(targetBooking.balancePending || 0) > 0) {
         setCustomers(cPrev => cPrev.map(c => {
           if (c.name.toLowerCase() === targetBooking.customerName.toLowerCase() || c.phone === targetBooking.customerPhone) {
-            return {
+            const updatedC = {
               ...c,
               pendingBalance: Math.max(0, (c.pendingBalance || 0) - Number(targetBooking.balancePending || 0))
             };
+            supabaseApi.saveCustomer(updatedC, business?.id || 'biz-001').catch(() => {});
+            return updatedC;
           }
           return c;
         }));
@@ -832,10 +968,24 @@ export const AppProvider = ({ children }) => {
       }
     } else if (newStatus === 'Ongoing') {
       if (targetBooking.vehicleId) {
-        setVehicles(vPrev => vPrev.map(v => v.id === targetBooking.vehicleId ? { ...v, status: 'On Trip' } : v));
+        setVehicles(vPrev => vPrev.map(v => {
+          if (v.id === targetBooking.vehicleId) {
+            const updatedV = { ...v, status: 'On Trip' };
+            supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+            return updatedV;
+          }
+          return v;
+        }));
       }
       if (targetBooking.driverId) {
-        setDrivers(dPrev => dPrev.map(d => d.id === targetBooking.driverId ? { ...d, status: 'On Trip' } : d));
+        setDrivers(dPrev => dPrev.map(d => {
+          if (d.id === targetBooking.driverId) {
+            const updatedD = { ...d, status: 'On Trip' };
+            supabaseApi.saveDriver(updatedD, business?.id || 'biz-001').catch(() => {});
+            return updatedD;
+          }
+          return d;
+        }));
       }
     }
   };
@@ -844,7 +994,9 @@ export const AppProvider = ({ children }) => {
   const updateVehicleOdometer = (vehicleId, newOdo) => {
     setVehicles(prev => prev.map(v => {
       if (v.id === vehicleId) {
-        return { ...v, odometer: Number(newOdo) };
+        const updatedV = { ...v, odometer: Number(newOdo) };
+        supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+        return updatedV;
       }
       return v;
     }));
@@ -860,10 +1012,12 @@ export const AppProvider = ({ children }) => {
       else if (docType === 'Fitness') updatedDocs.fitnessExpiry = newExpiryDate;
       else if (docType === 'Permit') updatedDocs.permitExpiry = newExpiryDate;
 
-      return {
+      const updatedV = {
         ...v,
         documents: updatedDocs
       };
+      supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+      return updatedV;
     }));
 
     setRenewalModalData(null);
@@ -873,11 +1027,13 @@ export const AppProvider = ({ children }) => {
   const renewDriverLicense = (driverId, newExpiryDate, dlNumber = '') => {
     setDrivers(prev => prev.map(d => {
       if (d.id !== driverId) return d;
-      return {
+      const updatedD = {
         ...d,
         dlExpiry: newExpiryDate,
         dlNumber: dlNumber || d.dlNumber
       };
+      supabaseApi.saveDriver(updatedD, business?.id || 'biz-001').catch(() => {});
+      return updatedD;
     }));
     setRenewalModalData(null);
   };
@@ -886,7 +1042,7 @@ export const AppProvider = ({ children }) => {
   const updateVehicleServiceSchedule = (vehicleId, serviceData) => {
     setVehicles(prev => prev.map(v => {
       if (v.id !== vehicleId) return v;
-      return {
+      const updatedV = {
         ...v,
         lastServiceOdometer: serviceData.lastServiceOdometer || v.odometer,
         nextServiceDueOdometer: serviceData.nextServiceDueOdometer || (v.odometer + 10000),
@@ -895,7 +1051,24 @@ export const AppProvider = ({ children }) => {
         lastServiceCost: serviceData.lastServiceCost || 0,
         lastWorkshop: serviceData.lastWorkshop || ''
       };
+      supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+      return updatedV;
     }));
+
+    // Also persist service history log to Supabase vehicle_services table
+    const serviceRecord = {
+      id: `svc-${Date.now().toString().slice(-6)}`,
+      vehicleId,
+      serviceType: serviceData.lastServiceType || 'General Service',
+      odometer: serviceData.lastServiceOdometer || 0,
+      cost: serviceData.lastServiceCost || 0,
+      serviceCenter: serviceData.lastWorkshop || '',
+      date: serviceData.lastServiceDate || new Date().toISOString().split('T')[0],
+      notes: serviceData.notes || 'Periodic 10K / General Maintenance'
+    };
+    supabaseApi.saveVehicleService(serviceRecord, business?.id || 'biz-001')
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Sync Vehicle Service Error]:', err));
   };
 
   // Periodic Service Alerts Checker
@@ -927,10 +1100,12 @@ export const AppProvider = ({ children }) => {
   const saveVehicleInspection = (bookingId, inspectionData) => {
     setBookings(prev => prev.map(b => {
       if (b.id !== bookingId) return b;
-      return {
+      const updatedB = {
         ...b,
         inspectionData
       };
+      supabaseApi.saveBooking(updatedB, business?.id || 'biz-001').catch(() => {});
+      return updatedB;
     }));
   };
 
@@ -938,12 +1113,14 @@ export const AppProvider = ({ children }) => {
   const saveDigitalSignature = (bookingId, signatureDataUrl, type = 'customer') => {
     setBookings(prev => prev.map(b => {
       if (b.id !== bookingId) return b;
-      return {
+      const updatedB = {
         ...b,
         customerSignature: type === 'customer' ? signatureDataUrl : b.customerSignature,
         driverSignature: type === 'driver' ? signatureDataUrl : b.driverSignature,
         signedAt: new Date().toISOString()
       };
+      supabaseApi.saveBooking(updatedB, business?.id || 'biz-001').catch(() => {});
+      return updatedB;
     }));
   };
 
@@ -1056,10 +1233,12 @@ export const AppProvider = ({ children }) => {
 
     setCustomers(prev => prev.map(c => {
       if (c.id === customerId) {
-        return {
+        const updatedC = {
           ...c,
           pendingBalance: Math.max(0, (c.pendingBalance || 0) - Number(amount))
         };
+        supabaseApi.saveCustomer(updatedC, business?.id || 'biz-001').catch(() => {});
+        return updatedC;
       }
       return c;
     }));
@@ -1490,6 +1669,10 @@ export const AppProvider = ({ children }) => {
 
     setExpenses(prev => [newExp, ...prev]);
 
+    supabaseApi.saveExpense(newExp, business?.id || 'biz-001')
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Sync Expense Error]:', err));
+
     recordTransaction({
       type: 'Expense',
       category: expenseData.category || 'General Fleet Expense',
@@ -1499,6 +1682,50 @@ export const AppProvider = ({ children }) => {
       vehiclePlate: expenseData.vehiclePlate || '',
       notes: expenseData.description || ''
     });
+  };
+
+  // Delete Expense
+  const deleteExpense = (expenseId) => {
+    setExpenses(prev => prev.filter(e => e.id !== expenseId));
+    supabaseApi.deleteExpense(expenseId)
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Delete Expense Error]:', err));
+  };
+
+  // Delete Transaction
+  const deleteTransaction = (transactionId) => {
+    setTransactions(prev => prev.filter(tx => tx.id !== transactionId));
+    supabaseApi.deleteTransaction(transactionId)
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Delete Transaction Error]:', err));
+  };
+
+  // Update Business Profile
+  const updateBusiness = (updatedBizData) => {
+    const mergedBiz = {
+      ...business,
+      ...updatedBizData
+    };
+    setBusiness(mergedBiz);
+    supabaseApi.saveBusiness(mergedBiz)
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Update Business Error]:', err));
+  };
+
+  // Update Rate Card
+  const updateRateCard = (rateCardData) => {
+    setRateCards(prev => prev.map(rc => rc.id === rateCardData.id ? { ...rc, ...rateCardData } : rc));
+    supabaseApi.saveRateCard(rateCardData, business?.id || 'biz-001')
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Update RateCard Error]:', err));
+  };
+
+  // Delete Rate Card
+  const deleteRateCard = (rateCardId) => {
+    setRateCards(prev => prev.filter(rc => rc.id !== rateCardId));
+    supabaseApi.deleteRateCard(rateCardId)
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Delete RateCard Error]:', err));
   };
 
   // Add Vehicle
@@ -1517,6 +1744,36 @@ export const AppProvider = ({ children }) => {
       }
     };
     setVehicles(prev => [newVeh, ...prev]);
+
+    supabaseApi.saveVehicle(newVeh, business?.id || 'biz-001')
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Sync Vehicle Error]:', err));
+  };
+
+  // Update Vehicle
+  const updateVehicle = (vehicleId, updatedData) => {
+    let fullUpdatedVeh = null;
+    setVehicles(prev => prev.map(v => {
+      if (v.id === vehicleId) {
+        fullUpdatedVeh = { ...v, ...updatedData };
+        return fullUpdatedVeh;
+      }
+      return v;
+    }));
+
+    if (fullUpdatedVeh) {
+      supabaseApi.saveVehicle(fullUpdatedVeh, business?.id || 'biz-001')
+        .then(() => setLastSyncedAt(new Date()))
+        .catch(err => console.warn('[Supabase Update Vehicle Error]:', err));
+    }
+  };
+
+  // Delete Vehicle
+  const deleteVehicle = (vehicleId) => {
+    setVehicles(prev => prev.filter(v => v.id !== vehicleId));
+    supabaseApi.deleteVehicle(vehicleId)
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Delete Vehicle Error]:', err));
   };
 
   // Phone Number Sanitizer & Formatter (Prevents duplicate +91 prefixes)
@@ -1552,6 +1809,10 @@ export const AppProvider = ({ children }) => {
       dlExpiry: driverData.dlExpiry || '2028-01-01'
     };
     setDrivers(prev => [newDrv, ...prev]);
+
+    supabaseApi.saveDriver(newDrv, business?.id || 'biz-001')
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Sync Driver Error]:', err));
   };
 
   // Update Driver
@@ -1560,28 +1821,38 @@ export const AppProvider = ({ children }) => {
     const cleanWhatsapp = updatedData.whatsapp ? formatPhoneNumber(updatedData.whatsapp) : (cleanPhone || undefined);
 
     let oldDrv = null;
+    let fullUpdatedDrv = null;
     setDrivers(prev => prev.map(d => {
       if (d.id === driverId) {
         oldDrv = d;
-        return {
+        fullUpdatedDrv = {
           ...d,
           ...updatedData,
           phone: cleanPhone || d.phone,
           whatsapp: cleanWhatsapp || d.whatsapp
         };
+        return fullUpdatedDrv;
       }
       return d;
     }));
+
+    if (fullUpdatedDrv) {
+      supabaseApi.saveDriver(fullUpdatedDrv, business?.id || 'biz-001')
+        .then(() => setLastSyncedAt(new Date()))
+        .catch(err => console.warn('[Supabase Sync Driver Error]:', err));
+    }
 
     // Update associated bookings if driver name or phone changed
     if (oldDrv && (updatedData.name || cleanPhone)) {
       setBookings(prev => prev.map(b => {
         if (b.driverId === driverId || (oldDrv.name && b.driverName === oldDrv.name)) {
-          return {
+          const updatedB = {
             ...b,
             driverName: updatedData.name || b.driverName,
             driverPhone: cleanPhone || b.driverPhone
           };
+          supabaseApi.saveBooking(updatedB, business?.id || 'biz-001').catch(() => {});
+          return updatedB;
         }
         return b;
       }));
@@ -1591,6 +1862,7 @@ export const AppProvider = ({ children }) => {
   // Delete Driver
   const deleteDriver = (driverId) => {
     setDrivers(prev => prev.filter(d => d.id !== driverId));
+    supabaseApi.deleteDriver(driverId).catch(err => console.warn('[Supabase Delete Driver Error]:', err));
   };
 
   // Add Customer
@@ -1605,6 +1877,10 @@ export const AppProvider = ({ children }) => {
       pendingBalance: 0
     };
     setCustomers(prev => [newCust, ...prev]);
+
+    supabaseApi.saveCustomer(newCust, business?.id || 'biz-001')
+      .then(() => setLastSyncedAt(new Date()))
+      .catch(err => console.warn('[Supabase Sync Customer Error]:', err));
   };
 
   // Update Customer
@@ -1613,28 +1889,38 @@ export const AppProvider = ({ children }) => {
     const cleanWhatsapp = updatedData.whatsapp ? formatPhoneNumber(updatedData.whatsapp) : (cleanPhone || undefined);
 
     let oldCust = null;
+    let fullUpdatedCust = null;
     setCustomers(prev => prev.map(c => {
       if (c.id === customerId) {
         oldCust = c;
-        return {
+        fullUpdatedCust = {
           ...c,
           ...updatedData,
           phone: cleanPhone || c.phone,
           whatsapp: cleanWhatsapp || c.whatsapp
         };
+        return fullUpdatedCust;
       }
       return c;
     }));
+
+    if (fullUpdatedCust) {
+      supabaseApi.saveCustomer(fullUpdatedCust, business?.id || 'biz-001')
+        .then(() => setLastSyncedAt(new Date()))
+        .catch(err => console.warn('[Supabase Sync Customer Error]:', err));
+    }
 
     // Update associated bookings if customer name or phone changed
     if (oldCust && (updatedData.name || cleanPhone)) {
       setBookings(prev => prev.map(b => {
         if (b.customerId === customerId || (oldCust.name && b.customerName === oldCust.name)) {
-          return {
+          const updatedB = {
             ...b,
             customerName: updatedData.name || b.customerName,
             customerPhone: cleanPhone || b.customerPhone
           };
+          supabaseApi.saveBooking(updatedB, business?.id || 'biz-001').catch(() => {});
+          return updatedB;
         }
         return b;
       }));
@@ -1644,6 +1930,7 @@ export const AppProvider = ({ children }) => {
   // Delete Customer
   const deleteCustomer = (customerId) => {
     setCustomers(prev => prev.filter(c => c.id !== customerId));
+    supabaseApi.deleteCustomer(customerId).catch(err => console.warn('[Supabase Delete Customer Error]:', err));
   };
 
   // Format Currency
@@ -1689,6 +1976,16 @@ export const AppProvider = ({ children }) => {
       setAuthUser(driverUser);
       setDriverActiveTab('duty');
       setIsAuthModalOpen(false);
+
+      // Save driver profile to Supabase
+      supabaseApi.saveProfile({
+        id: `usr-${matchedDriver.id}`,
+        businessId: business.id || 'biz-001',
+        role: 'driver',
+        name: matchedDriver.name,
+        phone: matchedDriver.phone
+      }).catch(() => {});
+
       return driverUser;
     }
 
@@ -1706,15 +2003,27 @@ export const AppProvider = ({ children }) => {
     };
     setAuthUser(ownerUser);
     if (userData.businessName) {
-      setBusiness(prev => ({
-        ...prev,
+      const updatedBiz = {
+        ...business,
         name: userData.businessName,
-        ownerName: userData.name || prev.ownerName,
-        phone: userData.phone || prev.phone,
-        whatsapp: userData.whatsapp || userData.phone || prev.whatsapp,
-        city: userData.city || prev.city
-      }));
+        ownerName: userData.name || business.ownerName,
+        phone: userData.phone || business.phone,
+        whatsapp: userData.whatsapp || userData.phone || business.whatsapp,
+        city: userData.city || business.city
+      };
+      setBusiness(updatedBiz);
+      supabaseApi.saveBusiness(updatedBiz).catch(() => {});
     }
+
+    // Save profile to Supabase
+    supabaseApi.saveProfile({
+      id: `usr-owner-${Date.now().toString().slice(-4)}`,
+      businessId: business.id || 'biz-001',
+      role: 'owner',
+      name: ownerUser.name,
+      phone: ownerUser.phone
+    }).catch(() => {});
+
     setIsAuthModalOpen(false);
     setActiveTab('home');
     return ownerUser;
@@ -1736,8 +2045,8 @@ export const AppProvider = ({ children }) => {
     };
 
     setAuthUser(user);
-    setBusiness(prev => ({
-      ...prev,
+    const newBiz = {
+      ...business,
       name: user.businessName,
       ownerName: user.name,
       phone: user.phone,
@@ -1746,7 +2055,18 @@ export const AppProvider = ({ children }) => {
       gstin: user.gstin,
       membershipPlan: user.plan,
       membershipStatus: user.membershipStatus
-    }));
+    };
+    setBusiness(newBiz);
+
+    // Save business & owner profile in Supabase
+    supabaseApi.saveBusiness(newBiz).catch(() => {});
+    supabaseApi.saveProfile({
+      id: `usr-owner-${Date.now().toString().slice(-4)}`,
+      businessId: newBiz.id || 'biz-001',
+      role: 'owner',
+      name: user.name,
+      phone: user.phone
+    }).catch(() => {});
 
     setIsAuthModalOpen(false);
     setActiveTab('home');
@@ -1817,10 +2137,16 @@ export const AppProvider = ({ children }) => {
       return b;
     }));
 
+    if (updatedBooking) {
+      supabaseApi.saveBooking(updatedBooking, business?.id || 'biz-001').catch(() => {});
+    }
+
     if (targetVehicleId) {
       setVehicles(prev => prev.map(v => {
         if (v.id === targetVehicleId) {
-          return { ...v, status: 'On Trip', odometer: numStartKm };
+          const updatedV = { ...v, status: 'On Trip', odometer: numStartKm };
+          supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+          return updatedV;
         }
         return v;
       }));
@@ -1829,7 +2155,9 @@ export const AppProvider = ({ children }) => {
     if (authUser?.driverId) {
       setDrivers(prev => prev.map(d => {
         if (d.id === authUser.driverId) {
-          return { ...d, status: 'On Trip' };
+          const updatedD = { ...d, status: 'On Trip' };
+          supabaseApi.saveDriver(updatedD, business?.id || 'biz-001').catch(() => {});
+          return updatedD;
         }
         return d;
       }));
@@ -1855,6 +2183,8 @@ export const AppProvider = ({ children }) => {
 
     setExpenses(prev => [newExp, ...prev]);
 
+    supabaseApi.saveExpense(newExp, business?.id || 'biz-001').catch(() => {});
+
     if (expenseData.type === 'Toll' || expenseData.type === 'Parking') {
       setBookings(prev => prev.map(b => {
         if (b.id === bookingId) {
@@ -1863,12 +2193,14 @@ export const AppProvider = ({ children }) => {
           const newToll = currentToll + addedToll;
           const newGross = Number(b.taxableAmount || 0) + Number(b.gstAmount || 0) + newToll;
           const newPending = Math.max(0, newGross - Number(b.advancePaid || 0));
-          return {
+          const updatedB = {
             ...b,
             tollParking: newToll,
             totalFare: newGross,
             balancePending: newPending
           };
+          supabaseApi.saveBooking(updatedB, business?.id || 'biz-001').catch(() => {});
+          return updatedB;
         }
         return b;
       }));
@@ -1926,10 +2258,14 @@ export const AppProvider = ({ children }) => {
 
     setBookings(prev => prev.map(b => b.id === bookingId ? completedBooking : b));
 
+    supabaseApi.saveBooking(completedBooking, business?.id || 'biz-001').catch(() => {});
+
     if (targetBooking.vehicleId) {
       setVehicles(prev => prev.map(v => {
         if (v.id === targetBooking.vehicleId) {
-          return { ...v, status: 'Free', odometer: numEndKm };
+          const updatedV = { ...v, status: 'Free', odometer: numEndKm };
+          supabaseApi.saveVehicle(updatedV, business?.id || 'biz-001').catch(() => {});
+          return updatedV;
         }
         return v;
       }));
@@ -1938,7 +2274,9 @@ export const AppProvider = ({ children }) => {
     if (targetBooking.driverId) {
       setDrivers(prev => prev.map(d => {
         if (d.id === targetBooking.driverId) {
-          return { ...d, status: 'Available' };
+          const updatedD = { ...d, status: 'Available' };
+          supabaseApi.saveDriver(updatedD, business?.id || 'biz-001').catch(() => {});
+          return updatedD;
         }
         return d;
       }));
@@ -1948,12 +2286,12 @@ export const AppProvider = ({ children }) => {
       recordTransaction({
         bookingId: targetBooking.id,
         invoiceNumber: targetBooking.invoiceNumber,
-        type: 'income',
+        type: 'Income',
         category: 'Trip Balance Collection',
         amount: finalPaidAmount,
         paymentMode: paymentMode,
         customerName: targetBooking.customerName,
-        description: `Balance collected by driver ${targetBooking.driverName || ''} (${paymentMode})`,
+        notes: `Balance collected by driver ${targetBooking.driverName || ''} (${paymentMode})`,
         date: new Date().toISOString().split('T')[0]
       });
     }
@@ -1969,12 +2307,12 @@ export const AppProvider = ({ children }) => {
     const driverName = driver?.name || 'Driver';
 
     recordTransaction({
-      type: 'income',
+      type: 'Income',
       category: 'Driver Cash Handover',
       amount: numAmt,
       paymentMode: 'Cash',
       customerName: driverName,
-      description: `Cash handover from driver ${driverName}: ${notes || 'Daily settlement'}`,
+      notes: `Cash handover from driver ${driverName}: ${notes || 'Daily settlement'}`,
       date: new Date().toISOString().split('T')[0]
     });
 
@@ -2156,12 +2494,20 @@ export const AppProvider = ({ children }) => {
     analyticsPeriod,
     setAnalyticsPeriod,
     addExpense,
+    deleteExpense,
+    deleteTransaction,
+    updateBusiness,
+    updateRateCard,
+    deleteRateCard,
     addVehicle,
+    updateVehicle,
+    deleteVehicle,
     addDriver,
     updateDriver,
     deleteDriver,
     addCustomer,
     updateCustomer,
+    deleteCustomer,
     isQuickQuoteOpen,
     setIsQuickQuoteOpen,
     selectedCorporateCustomer,
@@ -2188,7 +2534,11 @@ export const AppProvider = ({ children }) => {
     getSmartNotifications,
     getUnreadNotificationCount,
     formatCurrency,
-    formatPhoneNumber
+    formatPhoneNumber,
+    isCloudConnected,
+    cloudSyncStatus,
+    lastSyncedAt,
+    syncWithCloud
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

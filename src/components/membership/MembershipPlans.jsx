@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const MembershipPlans = ({ onClose }) => {
-  const { business, setBusiness, formatCurrency, t } = useApp();
+  const { business, updateBusiness, formatCurrency, t } = useApp();
 
   const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'yearly'
   const [couponCode, setCouponCode] = useState('');
@@ -82,13 +82,12 @@ export const MembershipPlans = ({ onClose }) => {
   const handleUpgrade = (plan) => {
     setIsProcessing(true);
     setTimeout(() => {
-      setBusiness(prev => ({
-        ...prev,
+      updateBusiness({
         membershipPlan: plan.id,
         vehicleLimit: plan.vehicles,
         staffLimit: plan.staff,
         membershipExpires: '2027-08-30'
-      }));
+      });
       setIsProcessing(false);
       setSuccessPlan(plan);
     }, 1200);

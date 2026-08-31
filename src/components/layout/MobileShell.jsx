@@ -8,7 +8,10 @@ import {
   Menu,
   Bell,
   Languages,
-  Plus
+  Plus,
+  Cloud,
+  CloudOff,
+  RefreshCw
 } from 'lucide-react';
 
 export const MobileShell = ({ children }) => {
@@ -24,7 +27,10 @@ export const MobileShell = ({ children }) => {
     getUnreadNotificationCount,
     setIsNotificationsOpen,
     setIsMembershipOpen,
-    quickDriverLogin
+    quickDriverLogin,
+    isCloudConnected,
+    cloudSyncStatus,
+    syncWithCloud
   } = useApp();
 
   const notifCounts = getUnreadNotificationCount ? getUnreadNotificationCount() : { total: 0, urgent: 0 };
@@ -60,8 +66,32 @@ export const MobileShell = ({ children }) => {
           </div>
         </div>
 
-        {/* Right: Language Switcher, Driver View Switcher & Alert Bell */}
+        {/* Right: Language Switcher, Driver View Switcher, Cloud Status & Alert Bell */}
         <div className="flex items-center space-x-2">
+          {/* Supabase Cloud Sync Status Pill */}
+          <button
+            onClick={() => syncWithCloud(true)}
+            className={`px-2 py-1 rounded-full border shadow-soft text-xs font-black flex items-center gap-1.5 transition-all tap-active ${
+              cloudSyncStatus === 'synced'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-950 hover:bg-emerald-100'
+                : cloudSyncStatus === 'syncing'
+                ? 'bg-blue-50 border-blue-300 text-blue-900 animate-pulse'
+                : 'bg-amber-50 border-amber-300 text-amber-900'
+            }`}
+            title={cloudSyncStatus === 'synced' ? 'Supabase Connected & Synced (Click to Refresh)' : 'Syncing with Supabase...'}
+          >
+            {cloudSyncStatus === 'syncing' ? (
+              <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />
+            ) : cloudSyncStatus === 'synced' ? (
+              <div className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200" />
+            ) : (
+              <CloudOff className="w-3 h-3 text-amber-600" />
+            )}
+            <span className="text-[10px] font-black uppercase tracking-wider hidden sm:inline">
+              {cloudSyncStatus === 'synced' ? 'Cloud' : cloudSyncStatus === 'syncing' ? 'Syncing' : 'Local'}
+            </span>
+          </button>
+
           {/* Language Toggle Pill */}
           <button
             onClick={toggleLanguage}
