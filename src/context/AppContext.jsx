@@ -317,12 +317,13 @@ export const AppProvider = ({ children }) => {
           category: 'trips',
           targetRole: 'driver',
           severity: isOngoing ? 'urgent' : 'info',
-          title: isOngoing ? `Ongoing Duty: #${b.bookingNumber || b.id}` : `New Duty Assigned: #${b.bookingNumber || b.id}`,
-          subtitle: `${b.pickupLocation || 'Pickup'} ➔ ${b.dropLocation || 'Drop'} • ${b.pickupDate || b.startDateTime || 'Today'} (${b.customerName || 'Passenger'})`,
-          timestamp: isOngoing ? 'In Progress' : 'New Assignment',
+          badgeText: isOngoing ? 'On Trip' : 'New Duty',
+          title: `Trip #${b.bookingNumber || b.id} • ${b.pickupLocation?.split(',')[0] || 'Pickup'}`,
+          subtitle: `To: ${b.dropLocation?.split(',')[0] || 'Drop'} • ${b.customerName || 'Passenger'}`,
+          timestamp: isOngoing ? 'Live' : 'Assigned',
           actionType: 'VIEW_DRIVER_DUTY',
           actionPayload: b,
-          actionLabel: isOngoing ? 'Trip Status' : 'View Duty Slip'
+          actionLabel: isOngoing ? 'Trip Status' : 'Duty Slip'
         });
       });
 
@@ -335,12 +336,13 @@ export const AppProvider = ({ children }) => {
           category: 'money',
           targetRole: 'driver',
           severity: 'urgent',
-          title: `Collect Passenger Fare: ₹${amount.toLocaleString('en-IN')}`,
-          subtitle: `Trip #${b.bookingNumber || b.id} • ${b.customerName || 'Passenger'} (${b.dropLocation || 'Drop'})`,
+          badgeText: `Collect ₹${amount.toLocaleString('en-IN')}`,
+          title: `Collect Fare: Trip #${b.bookingNumber || b.id}`,
+          subtitle: `${b.customerName || 'Passenger'} (${b.dropLocation?.split(',')[0] || 'Drop'})`,
           timestamp: 'Cash in Hand',
           actionType: 'COLLECT_CASH',
           actionPayload: { booking: b, amount },
-          actionLabel: 'Show UPI QR / Collect'
+          actionLabel: 'Collect UPI'
         });
       });
 
@@ -354,8 +356,9 @@ export const AppProvider = ({ children }) => {
             category: 'compliance',
             targetRole: 'driver',
             severity: diffDays <= 7 ? 'critical' : diffDays <= 15 ? 'urgent' : 'warning',
-            title: `Driving License (DL) ${diffDays <= 0 ? 'Expired' : 'Expiring Soon'}`,
-            subtitle: `Valid till ${currentDriver.dlExpiry} (${diffDays <= 0 ? '⚠️ Overdue' : `⏳ ${diffDays} days left`}) • Submit renewed copy to office`,
+            badgeText: diffDays <= 0 ? 'Expired' : `${diffDays}d left`,
+            title: `Driving License (DL) ${diffDays <= 0 ? 'Expired' : 'Renewal Due'}`,
+            subtitle: `Valid till ${currentDriver.dlExpiry} • Submit copy to office`,
             timestamp: 'DL Compliance',
             actionType: 'RENEW_DOC',
             actionPayload: {
@@ -366,7 +369,7 @@ export const AppProvider = ({ children }) => {
               isExpired: diffDays <= 0,
               isUrgent: diffDays <= 15
             },
-            actionLabel: 'Update License'
+            actionLabel: 'Renew DL'
           });
         }
       }
@@ -387,12 +390,13 @@ export const AppProvider = ({ children }) => {
         category: 'compliance',
         targetRole: 'all',
         severity: alt.isExpired ? 'critical' : alt.isUrgent ? 'urgent' : 'warning',
-        title: `${alt.vehiclePlate || alt.driverName} • ${alt.docType} ${alt.isExpired ? 'Expired' : 'Expiring Soon'}`,
-        subtitle: `Expires on ${alt.expiryDate} (${alt.isExpired ? '⚠️ Overdue' : `⏳ ${alt.daysLeft} days left`}) • Challan Risk: ₹10,000`,
+        badgeText: alt.isExpired ? 'EXPIRED' : `${alt.daysLeft}d left`,
+        title: `${alt.vehiclePlate || alt.driverName} • ${alt.docType}`,
+        subtitle: `Expires ${alt.expiryDate} • Challan risk ₹10,000`,
         timestamp: 'RTO Radar',
         actionType: 'RENEW_DOC',
         actionPayload: alt,
-        actionLabel: 'Renew Now'
+        actionLabel: 'Renew'
       });
     });
 
@@ -406,12 +410,13 @@ export const AppProvider = ({ children }) => {
         category: 'compliance',
         targetRole: 'all',
         severity: sa.isOverdue ? 'critical' : sa.isUrgent ? 'urgent' : 'warning',
-        title: `${sa.vehiclePlate} • Periodic Service Due`,
-        subtitle: `${sa.isOverdue ? `Overdue by ${Math.abs(sa.kmRemaining)} km` : `${sa.kmRemaining} km remaining`} • ${sa.serviceType}`,
+        badgeText: sa.isOverdue ? 'Overdue' : `${sa.kmRemaining} km`,
+        title: `${sa.vehiclePlate} • Service Due`,
+        subtitle: `${sa.serviceType} • Odometer ${sa.currentOdometer?.toLocaleString()} km`,
         timestamp: 'Maintenance',
         actionType: 'SERVICE_VEHICLE',
         actionPayload: veh,
-        actionLabel: 'Book Service'
+        actionLabel: 'Service'
       });
     });
 
@@ -425,12 +430,13 @@ export const AppProvider = ({ children }) => {
             category: 'trips',
             targetRole: 'dispatcher',
             severity: 'urgent',
-            title: `Unassigned Trip #${b.bookingNumber || b.id}`,
-            subtitle: `${b.pickupLocation || 'Pickup'} ➔ ${b.dropLocation || 'Drop'} • ${b.pickupDate || b.startDateTime || 'Upcoming'} (${b.customerName || 'Customer'})`,
+            badgeText: 'Unassigned',
+            title: `Trip #${b.bookingNumber || b.id} • ${b.pickupLocation?.split(',')[0] || 'Pickup'}`,
+            subtitle: `Drop: ${b.dropLocation?.split(',')[0] || 'Drop'} • ${b.customerName || 'Customer'}`,
             timestamp: 'Needs Dispatch',
             actionType: 'ASSIGN_DRIVER',
             actionPayload: b,
-            actionLabel: 'Assign Driver & Car'
+            actionLabel: 'Assign'
           });
         }
       }
@@ -444,12 +450,13 @@ export const AppProvider = ({ children }) => {
             category: 'trips',
             targetRole: 'dispatcher',
             severity: 'warning',
-            title: `Departure Pending: #${b.bookingNumber || b.id}`,
-            subtitle: `Scheduled for ${b.startDateTime.slice(11, 16) || 'earlier'} • Driver has not started trip yet`,
+            badgeText: 'Departure Due',
+            title: `Departure Alert: #${b.bookingNumber || b.id}`,
+            subtitle: `Scheduled for ${b.startDateTime.slice(11, 16) || 'earlier'} • Driver start pending`,
             timestamp: 'Delay Radar',
             actionType: 'VIEW_TRIP',
             actionPayload: b,
-            actionLabel: 'Check Trip'
+            actionLabel: 'Check'
           });
         }
       }
@@ -464,12 +471,13 @@ export const AppProvider = ({ children }) => {
           category: 'money',
           targetRole: 'accountant',
           severity: c.pendingBalance >= 15000 ? 'urgent' : 'warning',
-          title: `Pending Recovery: ₹${c.pendingBalance.toLocaleString('en-IN')} (${c.name})`,
-          subtitle: `${c.company || 'Corporate Client'} • Balance pending across completed rides`,
+          badgeText: `₹${c.pendingBalance.toLocaleString('en-IN')}`,
+          title: `Pending Due: ${c.name}`,
+          subtitle: `${c.company || 'Client'} • Unpaid rides balance`,
           timestamp: 'Accounts Due',
           actionType: 'SETTLE_CUSTOMER',
           actionPayload: c,
-          actionLabel: 'Send WA Due Link'
+          actionLabel: 'Send Link'
         });
       }
     });
@@ -482,12 +490,13 @@ export const AppProvider = ({ children }) => {
         category: 'money',
         targetRole: 'accountant',
         severity: 'info',
-        title: `GST Invoice Ready: #${b.bookingNumber || b.id}`,
-        subtitle: `${b.customerName} • Net Fare ₹${(b.totalAmount || b.netFare || 0).toLocaleString('en-IN')} • 1-click tax bill`,
+        badgeText: 'Tax Invoice',
+        title: `Trip #${b.bookingNumber || b.id} • ${b.customerName}`,
+        subtitle: `Net Fare ₹${(b.totalAmount || b.netFare || 0).toLocaleString('en-IN')} • GST bill ready`,
         timestamp: 'Billing',
         actionType: 'GENERATE_INVOICE',
         actionPayload: b,
-        actionLabel: 'Generate GST Bill'
+        actionLabel: 'Create Bill'
       });
     });
 

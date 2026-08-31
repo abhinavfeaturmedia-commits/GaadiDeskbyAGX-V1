@@ -54,6 +54,8 @@ export const HomeDashboard = () => {
 
   const financialStats = getFinancialStats();
   const fleetStats = getFleetStats();
+  const alerts = getDocumentAlerts ? getDocumentAlerts() : [];
+  const serviceAlerts = getServiceAlerts ? getServiceAlerts() : [];
   const smartNotifs = getSmartNotifications ? getSmartNotifications() : [];
   const urgentSmartNotifs = smartNotifs.filter(n => (n.severity === 'critical' || n.severity === 'urgent') && !n.isRead);
   const primaryAlert = urgentSmartNotifs[0] || smartNotifs.find(n => !n.isRead);
