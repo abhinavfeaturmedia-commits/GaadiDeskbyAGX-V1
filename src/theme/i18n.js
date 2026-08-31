@@ -53,10 +53,28 @@ export const translations = {
     pendingFromCustomers: "Customer Pending",
     tripsToday: "Today's Trips",
 
-    // Alerts
+    // Alerts & Notification Center
     expiryAlertTitle: "Document Expiry Alerts",
     expiringInDays: "expiring in {days} days",
     viewExpiringCars: "Review Documents",
+    notifCenterTitle: "Notifications & Radar Alerts",
+    notifUrgentTab: "🚨 Urgent",
+    notifAllTab: "All",
+    notifTripsTab: "🚗 Trips",
+    notifComplianceTab: "🛡️ RTO & Service",
+    notifMoneyTab: "💰 Money",
+    notifMarkAllRead: "Mark all read",
+    notifClearAll: "Clear",
+    notifEmptyTitle: "All Clear!",
+    notifEmptyDesc: "You have no pending alerts or urgent actions.",
+    notifRenewNow: "Renew Now",
+    notifAssignDriver: "Assign Driver",
+    notifSendWaReminder: "Send WA Due Link",
+    notifGenerateInvoice: "Tax Invoice",
+    notifCollectCash: "Collect Cash / UPI",
+    notifViewTrip: "View Duty Slip",
+    notifServiceNow: "Book Service",
+
 
     // Actions & Buttons
     btnSave: "Save",
@@ -171,6 +189,30 @@ export const translations = {
     clashWarning: "⚠️ Conflict! This car is already booked between {start} and {end}. Please select another car or change the time slot.",
     fieldRequired: "This field is required",
     bookingSuccess: "Booking confirmed successfully! WhatsApp slip ready.",
+
+    // Driver Specific
+    navDriverDuty: "Duty",
+    navDriverTrips: "My Trips",
+    navDriverWallet: "Cash & Bata",
+    navDriverProfile: "Profile",
+    driverReadyForDuty: "Ready for Duty",
+    driverOnDuty: "On Active Duty",
+    driverOnLeave: "On Leave",
+    driverNoActiveTrip: "No active trip assigned right now",
+    driverStartTrip: "Start Trip & Meter",
+    driverEndTrip: "End Trip & Settle",
+    driverStartKm: "Starting Odometer (KM)",
+    driverEndKm: "Ending Odometer (KM)",
+    driverAddToll: "+ Add Toll / Expense",
+    driverTollExpenses: "Toll & Highway Expenses",
+    driverShowUpiQr: "Show Owner UPI QR",
+    driverCashCollected: "Cash Collected",
+    driverCashInHand: "Cash in Hand",
+    driverTotalBata: "Bata Earned",
+    driverCashToSubmit: "Submit to Office",
+    driverSubmitCash: "Handover Cash to Office",
+    driverDlExpiry: "License Expiry",
+    driverEmergencyContact: "Emergency SOS"
   },
 
   hi: {
@@ -225,10 +267,28 @@ export const translations = {
     pendingFromCustomers: "ग्राहकों से बाकी",
     tripsToday: "आज की ट्रिप्स",
 
-    // Alerts
+    // Alerts & Notification Center
     expiryAlertTitle: "कागजात रिन्यूअल अलर्ट",
     expiringInDays: "{days} दिनों में खत्म",
     viewExpiringCars: "कागजात जांचें",
+    notifCenterTitle: "सूचनाएं और रडार अलर्ट",
+    notifUrgentTab: "🚨 जरूरी",
+    notifAllTab: "सभी",
+    notifTripsTab: "🚗 ट्रिप्स",
+    notifComplianceTab: "🛡️ RTO और सर्विस",
+    notifMoneyTab: "💰 हिसाब-किताब",
+    notifMarkAllRead: "सभी पढ़े हुए मार्क करें",
+    notifClearAll: "हटाएं",
+    notifEmptyTitle: "सब कुछ सही है!",
+    notifEmptyDesc: "फिलहाल कोई जरूरी या पेंडिंग अलर्ट नहीं है।",
+    notifRenewNow: "रिन्यू करें",
+    notifAssignDriver: "ड्राइवर चुनें",
+    notifSendWaReminder: "व्हाट्सएप पेमेंट लिंक भेजें",
+    notifGenerateInvoice: "GST बिल बनाएं",
+    notifCollectCash: "पैसे / UPI लें",
+    notifViewTrip: "ड्यूटी स्लिप देखें",
+    notifServiceNow: "सर्विस बुक करें",
+
 
     // Actions & Buttons
     btnSave: "सुरक्षित करें",
@@ -343,5 +403,29 @@ export const translations = {
     clashWarning: "⚠️ रुकावट! यह गाड़ी {start} से {end} के बीच पहले से बुक है। कृपया दूसरी गाड़ी चुनें।",
     fieldRequired: "यह जानकारी भरना जरूरी है",
     bookingSuccess: "बुकिंग सफलतापूर्वक सुरक्षित हो गई! व्हाट्सएप स्लिप तैयार है।",
+
+    // Driver Specific
+    navDriverDuty: "ड्यूटी",
+    navDriverTrips: "मेरी ट्रिप्स",
+    navDriverWallet: "कैश व बाटा",
+    navDriverProfile: "प्रोफाइल",
+    driverReadyForDuty: "ड्यूटी के लिए तैयार",
+    driverOnDuty: "ड्यूटी चालू है",
+    driverOnLeave: "छुट्टी पर",
+    driverNoActiveTrip: "फिलहाल कोई ट्रिप तय नहीं है",
+    driverStartTrip: "मीटर व ट्रिप चालू करें",
+    driverEndTrip: "ट्रिप समाप्त करें",
+    driverStartKm: "शुरुआती मीटर (KM)",
+    driverEndKm: "अंतिम मीटर (KM)",
+    driverAddToll: "+ टोल / डीजल जोड़ें",
+    driverTollExpenses: "टोल व रास्ते का खर्च",
+    driverShowUpiQr: "मालिक का UPI QR दिखाएं",
+    driverCashCollected: "कैश प्राप्त हुआ",
+    driverCashInHand: "हाथ में नकद",
+    driverTotalBata: "कमाई गई बाटा रकम",
+    driverCashToSubmit: "ऑफिस में जमा योग्य",
+    driverSubmitCash: "ऑफिस में कैश जमा करें",
+    driverDlExpiry: "लाइसेंस वैधता",
+    driverEmergencyContact: "आपातकालीन संपर्क"
   }
 };

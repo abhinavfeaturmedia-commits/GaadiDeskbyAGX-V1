@@ -19,6 +19,8 @@ export const AuthModal = () => {
     loginUser,
     registerUser,
     quickDemoLogin,
+    quickDriverLogin,
+    drivers,
     language,
     toggleLanguage
   } = useApp();
@@ -334,6 +336,60 @@ export const AuthModal = () => {
                   autoFocus
                 />
               </div>
+
+              {/* Real-time Driver / Owner Detection Badge */}
+              {(() => {
+                const rawDigits = phoneRaw.replace(/\D/g, '');
+                const detectedDriver = drivers.find(d => {
+                  const cleanDrv = (d.phone || '').replace(/\D/g, '');
+                  return cleanDrv.endsWith(rawDigits.slice(-10)) || (rawDigits.length >= 10 && cleanDrv.includes(rawDigits.slice(-10)));
+                });
+
+                if (detectedDriver) {
+                  return (
+                    <div className="p-2.5 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-center justify-between animate-fade-in shadow-xs">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-xs font-black">
+                          🚗
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-emerald-800 tracking-wide block">
+                            {isHindi ? 'ड्राइवर प्रोफाइल पहचानी गई' : 'Driver Profile Auto-Detected'}
+                          </span>
+                          <span className="text-xs font-black text-emerald-950">
+                            {detectedDriver.name} ({detectedDriver.phone})
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full">
+                        Driver Cockpit
+                      </span>
+                    </div>
+                  );
+                } else if (rawDigits.length >= 10) {
+                  return (
+                    <div className="p-2.5 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-center justify-between animate-fade-in shadow-xs">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-7 h-7 rounded-xl bg-amber-600 text-white flex items-center justify-center text-xs font-black">
+                          🏢
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-amber-800 tracking-wide block">
+                            {isHindi ? 'फ्लीट मालिक अकाउंट' : 'Fleet Owner Account'}
+                          </span>
+                          <span className="text-xs font-black text-amber-950">
+                            {authMode === 'login' ? 'Owner / Admin Console' : 'New Fleet Registration'}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
+                        Admin Role
+                      </span>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
 
             <button
@@ -344,31 +400,80 @@ export const AuthModal = () => {
               <ArrowRight className="w-4 h-4 text-[#D4F05B]" />
             </button>
 
-            {/* Quick Demo Login Option */}
-            <div className="pt-1 text-center">
-              <div className="relative flex py-2 items-center">
+            {/* Quick Demo Logins Section */}
+            <div className="pt-1 text-center space-y-2">
+              <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-gray-200" />
-                <span className="flex-shrink mx-2 text-[10px] font-black text-[#4B5563] uppercase">Or test immediately</span>
+                <span className="flex-shrink mx-2 text-[10px] font-black text-[#4B5563] uppercase">
+                  {isHindi ? 'या त्वरित 1-क्लिक टेस्ट करें' : 'Or Instant 1-Click Role Testing'}
+                </span>
                 <div className="flex-grow border-t border-gray-200" />
               </div>
 
+              {/* Owner Demo Login */}
               <button
                 type="button"
                 onClick={handleTriggerDemo}
                 disabled={isDemoLoading}
-                className="w-full py-2.5 rounded-full bg-gray-50 hover:bg-gray-100 border-2 border-[#E5DFD3] text-[#111827] font-black text-xs shadow-xs transition tap-active flex items-center justify-center space-x-2"
+                className="w-full py-2 px-3 rounded-2xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-950 font-black text-xs shadow-xs transition tap-active flex items-center justify-between"
               >
-                {isDemoLoading ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 text-[#EA580C] animate-spin" />
-                    <span>Loading Live Demo...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 text-[#EA580C]" />
-                    <span>{isHindi ? '⚡ 1-क्लिक लाइव डेमो (बिना टाइप किए)' : '⚡ 1-Click Instant Demo (Skip Login)'}</span>
-                  </>
-                )}
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm">🏢</span>
+                  <span className="text-left font-bold">{isHindi ? 'फ्लीट मालिक डेमो (रमेश)' : 'Fleet Owner Demo (Ramesh)'}</span>
+                </div>
+                <span className="text-[10px] bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full font-black">
+                  Admin
+                </span>
+              </button>
+
+              {/* Driver 1 Demo Login (Sachin Shinde - Available) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDemoLoading(true);
+                  setTimeout(() => {
+                    quickDriverLogin('drv-01');
+                    setIsDemoLoading(false);
+                  }, 300);
+                }}
+                disabled={isDemoLoading}
+                className="w-full py-2 px-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-950 font-black text-xs shadow-xs transition tap-active flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm">🚗</span>
+                  <div className="text-left">
+                    <span className="font-bold block leading-tight">{isHindi ? 'ड्राइवर डेमो (सचिन शिंदे)' : 'Driver Demo (Sachin Shinde)'}</span>
+                    <span className="text-[10px] text-emerald-700 font-semibold">{isHindi ? 'ड्यूटी के लिए उपलब्ध' : 'Ready for Duty • Dzire VXi'}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full font-black">
+                  Driver
+                </span>
+              </button>
+
+              {/* Driver 2 Demo Login (Santosh More - On Trip) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDemoLoading(true);
+                  setTimeout(() => {
+                    quickDriverLogin('drv-02');
+                    setIsDemoLoading(false);
+                  }, 300);
+                }}
+                disabled={isDemoLoading}
+                className="w-full py-2 px-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-950 font-black text-xs shadow-xs transition tap-active flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm">🛣️</span>
+                  <div className="text-left">
+                    <span className="font-bold block leading-tight">{isHindi ? 'ड्राइवर डेमो (संतोष मोरे)' : 'Driver Demo (Santosh More)'}</span>
+                    <span className="text-[10px] text-blue-700 font-semibold">{isHindi ? 'महाबलेश्वर ट्रिप पर' : 'Active Duty • Mahabaleshwar'}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-blue-200 text-blue-900 px-2 py-0.5 rounded-full font-black">
+                  On Duty
+                </span>
               </button>
             </div>
           </form>

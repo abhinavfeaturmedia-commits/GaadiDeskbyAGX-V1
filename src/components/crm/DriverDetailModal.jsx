@@ -17,19 +17,43 @@ import {
   Receipt,
   User,
   Gauge,
-  Wallet
+  Wallet,
+  Edit3,
+  Trash2,
+  Save,
+  CheckCircle2,
+  Clock
 } from 'lucide-react';
 
 export const DriverDetailModal = ({ driver, onClose }) => {
   const {
     bookings,
+    updateDriver,
+    deleteDriver,
     formatCurrency,
+    formatPhoneNumber,
     setSelectedTripDetailBooking,
     setRenewalModalData,
     setWhatsAppData
   } = useApp();
 
   const [dutyFilter, setDutyFilter] = useState('All'); // 'All' | 'Completed' | 'Ongoing'
+  const [isEditing, setIsEditing] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    name: driver?.name || '',
+    phone: driver?.phone || '',
+    whatsapp: driver?.whatsapp || driver?.phone || '',
+    dlNumber: driver?.dlNumber || '',
+    dlExpiry: driver?.dlExpiry || '2028-01-01',
+    payoutType: driver?.payoutType || 'Salary',
+    monthlySalary: driver?.monthlySalary || 18000,
+    commissionRate: driver?.commissionRate || 3,
+    emergencyContact: driver?.emergencyContact || '',
+    status: driver?.status || 'Available'
+  });
 
   if (!driver) return null;
 
@@ -79,6 +103,26 @@ export const DriverDetailModal = ({ driver, onClose }) => {
     });
   };
 
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    if (!editForm.name.trim() || !editForm.phone.trim()) {
+      alert("Driver name and phone number are required.");
+      return;
+    }
+
+    updateDriver(driver.id, editForm);
+    setIsEditing(false);
+    setSaveSuccessMsg('🎉 Driver details updated successfully!');
+    setTimeout(() => setSaveSuccessMsg(''), 3500);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Are you sure you want to remove driver "${driver.name}" from fleet records?`)) {
+      deleteDriver(driver.id);
+      onClose();
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
       <div className="bg-[#F8F6F0] w-full max-w-xl rounded-t-3xl sm:rounded-4xl max-h-[92vh] flex flex-col shadow-2xl border-2 border-[#E5DFD3] overflow-hidden">
@@ -94,177 +138,375 @@ export const DriverDetailModal = ({ driver, onClose }) => {
                 <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
                   driver.status === 'On Trip'
                     ? 'bg-emerald-100 text-emerald-900 border-emerald-300 animate-pulse'
+                    : driver.status === 'Leave'
+                    ? 'bg-rose-100 text-rose-900 border-rose-300'
                     : 'bg-gray-100 text-gray-800 border-gray-300'
                 }`}>
                   {driver.status || 'Available'}
                 </span>
               </div>
               <p className="text-xs text-[#4B5563] font-semibold mt-0.5">
-                📞 +91 {driver.phone}
+                📞 {formatPhoneNumber(driver.phone)}
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                setEditForm({
+                  name: driver.name || '',
+                  phone: driver.phone || '',
+                  whatsapp: driver.whatsapp || driver.phone || '',
+                  dlNumber: driver.dlNumber || '',
+                  dlExpiry: driver.dlExpiry || '2028-01-01',
+                  payoutType: driver.payoutType || 'Salary',
+                  monthlySalary: driver.monthlySalary || 18000,
+                  commissionRate: driver.commissionRate || 3,
+                  emergencyContact: driver.emergencyContact || '',
+                  status: driver.status || 'Available'
+                });
+                setIsEditing(!isEditing);
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition tap-active shadow-xs ${
+                isEditing
+                  ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                  : 'bg-gray-100 text-[#111827] hover:bg-gray-200 border border-[#E5DFD3]'
+              }`}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>{isEditing ? 'Cancel Edit' : 'Edit Driver'}</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-          {/* Performance & Payout Summary */}
-          <div className="grid grid-cols-3 gap-2.5">
-            <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
-              <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
-                Trips Driven
-              </span>
-              <span className="text-lg font-black text-[#111827] mt-0.5 block">
-                {driverTrips.length}
-              </span>
-              <span className="text-[10px] text-emerald-700 font-bold">
-                {completedTrips.length} Completed
-              </span>
+          {saveSuccessMsg && (
+            <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-emerald-950 text-xs font-black flex items-center space-x-2 animate-fade-in shadow-xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{saveSuccessMsg}</span>
             </div>
+          )}
 
-            <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
-              <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
-                Odometer KM
-              </span>
-              <span className="text-lg font-black text-[#111827] mt-0.5 block">
-                {totalKmDriven.toLocaleString()} KM
-              </span>
-              <span className="text-[10px] text-blue-700 font-bold">
-                Logged on Road
-              </span>
-            </div>
-
-            <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
-              <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
-                Driver Bata / Payout
-              </span>
-              <span className="text-lg font-black text-amber-900 mt-0.5 block">
-                {formatCurrency(totalBataEarned)}
-              </span>
-              <span className="text-[10px] text-amber-700 font-bold">
-                Trip Allowance
-              </span>
-            </div>
-          </div>
-
-          {/* License & Employment Dossier Card */}
-          <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] space-y-3 shadow-xs">
-            <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span>License & Employment Terms</span>
-            </h4>
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3]">
-                <span className="text-[10px] font-bold text-gray-500 block">Driving License No.</span>
-                <span className="font-mono font-black text-[#111827]">
-                  {driver.dlNumber || 'MH12 20190014298'}
-                </span>
-              </div>
-
-              <div className={`p-2.5 rounded-xl border ${
-                isDlUrgent
-                  ? 'bg-rose-50 border-rose-300 text-rose-950'
-                  : 'bg-[#F8F6F0] border-[#E5DFD3] text-[#111827]'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-gray-500 block">DL Expiry</span>
-                  {isDlUrgent && <span className="text-[9px] font-black bg-rose-600 text-white px-1.5 py-0.2 rounded">Urgent</span>}
+          {/* ===================================================== */}
+          {/* EDIT FORM MODE */}
+          {/* ===================================================== */}
+          {isEditing ? (
+            <form onSubmit={handleSaveEdit} className="bg-white rounded-3xl p-5 border-2 border-amber-300 shadow-soft space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                <div className="flex items-center space-x-2">
+                  <Edit3 className="w-4 h-4 text-amber-600" />
+                  <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">
+                    Edit Driver Details
+                  </h4>
                 </div>
-                <span className="font-black">
-                  📅 {driver.dlExpiry || '2028-01-01'}
-                </span>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="text-xs font-black text-red-600 hover:text-red-700 flex items-center gap-1 tap-active"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Remove Driver</span>
+                </button>
               </div>
 
-              <div className="bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3]">
-                <span className="text-[10px] font-bold text-gray-500 block">Salary / Scheme</span>
-                <span className="font-black text-[#111827]">
-                  ₹{driver.monthlySalary || 18000}/mo ({driver.payoutType || 'Salary'})
-                </span>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-black text-[#111827] block mb-1">
+                    Driver Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.phone}
+                      onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      WhatsApp Number
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.whatsapp}
+                      onChange={e => setEditForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      License (DL) Number
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.dlNumber}
+                      onChange={e => setEditForm(prev => ({ ...prev, dlNumber: e.target.value.toUpperCase() }))}
+                      placeholder="e.g. MH12 20180012345"
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-mono font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      License Expiry Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editForm.dlExpiry}
+                      onChange={e => setEditForm(prev => ({ ...prev, dlExpiry: e.target.value }))}
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      Payout Scheme
+                    </label>
+                    <select
+                      value={editForm.payoutType}
+                      onChange={e => setEditForm(prev => ({ ...prev, payoutType: e.target.value }))}
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    >
+                      <option value="Salary">Monthly Salary</option>
+                      <option value="Commission">Commission Per KM</option>
+                      <option value="Attached">Attached / Freelance</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      {editForm.payoutType === 'Salary' ? 'Monthly Salary (₹)' : 'Rate / KM (₹)'}
+                    </label>
+                    <input
+                      type="number"
+                      value={editForm.payoutType === 'Salary' ? editForm.monthlySalary : editForm.commissionRate}
+                      onChange={e => {
+                        const val = Number(e.target.value);
+                        if (editForm.payoutType === 'Salary') {
+                          setEditForm(prev => ({ ...prev, monthlySalary: val }));
+                        } else {
+                          setEditForm(prev => ({ ...prev, commissionRate: val }));
+                        }
+                      }}
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      Duty Availability Status
+                    </label>
+                    <select
+                      value={editForm.status}
+                      onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value }))}
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    >
+                      <option value="Available">🟢 Available (Ready for Duty)</option>
+                      <option value="On Trip">🟡 On Trip</option>
+                      <option value="Leave">🔴 On Leave</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      Emergency SOS Contact
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.emergencyContact}
+                      onChange={e => setEditForm(prev => ({ ...prev, emergencyContact: e.target.value }))}
+                      placeholder="e.g. 98901 99999 (Brother)"
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3]">
-                <span className="text-[10px] font-bold text-gray-500 block">Emergency Contact</span>
-                <span className="font-semibold text-[#111827]">
-                  {driver.emergencyContact || '+91 9822001122'}
-                </span>
+              <div className="flex items-center space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="flex-1 py-2.5 rounded-full bg-gray-100 text-[#4B5563] text-xs font-black hover:bg-gray-200 tap-active"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-2 py-2.5 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black shadow-md flex items-center justify-center gap-1.5 tap-active"
+                >
+                  <Save className="w-3.5 h-3.5 text-[#D4F05B]" />
+                  <span>Save Driver Profile</span>
+                </button>
               </div>
-            </div>
+            </form>
+          ) : (
+            /* ===================================================== */
+            /* VIEW MODE */
+            /* ===================================================== */
+            <>
+              {/* Performance & Payout Summary */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
+                  <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
+                    Trips Driven
+                  </span>
+                  <span className="text-lg font-black text-[#111827] mt-0.5 block">
+                    {driverTrips.length}
+                  </span>
+                  <span className="text-[10px] text-emerald-700 font-bold">
+                    {completedTrips.length} Completed
+                  </span>
+                </div>
 
-            {/* Quick Actions Row */}
-            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
-              <a
-                href={`tel:${driver.phone}`}
-                className="py-2 rounded-xl bg-white border border-[#E5DFD3] text-[#111827] text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-gray-50 tap-active shadow-xs"
-              >
-                <Phone className="w-3.5 h-3.5 text-blue-600" />
-                <span>Call Driver</span>
-              </a>
+                <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
+                  <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
+                    Odometer KM
+                  </span>
+                  <span className="text-lg font-black text-[#111827] mt-0.5 block">
+                    {totalKmDriven.toLocaleString()} KM
+                  </span>
+                  <span className="text-[10px] text-blue-700 font-bold">
+                    Logged on Road
+                  </span>
+                </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  setWhatsAppData({
-                    type: 'duty',
-                    booking: driverTrips[0] || {
-                      customerName: 'Assigned Duty',
-                      customerPhone: '9876543210',
-                      pickupLocation: 'Pune Station',
-                      dropLocation: 'Mumbai Airport',
-                      startDateTime: new Date().toISOString(),
-                      driverName: driver.name,
-                      driverPhone: driver.phone,
-                      vehiclePlate: 'MH12 AB 1234',
-                      id: 'DUTY-DISPATCH'
-                    }
-                  });
-                }}
-                className="py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-100 tap-active shadow-xs"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                <span>WhatsApp</span>
-              </button>
+                <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
+                  <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
+                    Driver Bata / Payout
+                  </span>
+                  <span className="text-lg font-black text-amber-900 mt-0.5 block">
+                    {formatCurrency(totalBataEarned)}
+                  </span>
+                  <span className="text-[10px] text-amber-800 font-bold">
+                    {driver.payoutType || 'Salary'}
+                  </span>
+                </div>
+              </div>
 
-              <button
-                type="button"
-                onClick={handleRenewDl}
-                className="py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs font-black flex items-center justify-center gap-1 shadow-xs tap-active border border-amber-300"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-800" />
-                <span>Renew DL</span>
-              </button>
-            </div>
-          </div>
+              {/* Compliance & License Status Card */}
+              <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Driving License Compliance</span>
+                  </h4>
 
-          {/* Assigned Duties & History Section */}
+                  <span className="text-xs font-mono font-black text-[#111827] bg-[#F8F6F0] px-2.5 py-1 rounded-xl border border-[#E5DFD3]">
+                    {driver.dlNumber || 'MH12 20180099881'}
+                  </span>
+                </div>
+
+                <div className="bg-[#F8F6F0] p-3 rounded-2xl border border-[#E5DFD3] flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-[#4B5563] font-bold block">License Expiry Date</span>
+                    <span className="text-xs font-black text-[#111827]">
+                      📅 {driver.dlExpiry || '2028-01-01'}
+                    </span>
+                  </div>
+
+                  <div className="text-right">
+                    {isDlUrgent ? (
+                      <span className="text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-300">
+                        ⚠️ Expiring Soon ({daysUntilExpiry} days)
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                        ✓ Active & Verified
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3]">
+                    <span className="text-[10px] text-[#4B5563] font-bold block">Salary / Compensation</span>
+                    <span className="font-black text-[#111827]">
+                      {driver.payoutType === 'Salary'
+                        ? `₹${driver.monthlySalary || 18000}/mo`
+                        : `₹${driver.commissionRate || 3}/km Commission`}
+                    </span>
+                  </div>
+
+                  <div className="bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3]">
+                    <span className="text-[10px] text-[#4B5563] font-bold block">Emergency SOS Contact</span>
+                    <span className="font-bold text-[#111827] truncate block">
+                      {formatPhoneNumber(driver.emergencyContact || '+91 98220 01122')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Direct Action Links */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <a
+                    href={`tel:${driver.phone}`}
+                    className="py-2 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-[#111827] text-xs font-black flex items-center justify-center gap-1.5 tap-active"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Call Driver</span>
+                  </a>
+
+                  <button
+                    onClick={() => setWhatsAppData({ type: 'booking', booking: { driverName: driver.name, driverPhone: driver.phone, id: 'DUTY' } })}
+                    className="py-2 px-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-emerald-950 text-xs font-black flex items-center justify-center gap-1.5 tap-active"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-[#25D366]" />
+                    <span>WhatsApp Duty</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ===================================================== */}
+          {/* DRIVER DUTY & TRIP HISTORY */}
+          {/* ===================================================== */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider flex items-center gap-1.5">
-                  <Navigation className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Assigned Duties & Trips ({driverTrips.length})</span>
-                </h4>
-                <p className="text-[10px] text-[#4B5563] font-semibold">
-                  Click on any duty to inspect full route, passenger & meter info
-                </p>
-              </div>
+              <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">
+                Duty History ({driverTrips.length})
+              </h4>
 
-              {/* Duty Filter Pills */}
-              <div className="flex space-x-1 bg-white p-1 rounded-full border border-[#E5DFD3]">
-                {['All', 'Completed', 'Ongoing'].map(f => (
+              {/* Filter Tabs */}
+              <div className="flex bg-white p-1 rounded-full border-2 border-[#E5DFD3] text-[10px] font-black shadow-xs">
+                {['All', 'Ongoing', 'Completed'].map(f => (
                   <button
                     key={f}
                     onClick={() => setDutyFilter(f)}
-                    className={`px-2 py-0.5 text-[10px] font-black rounded-full transition-all ${
-                      dutyFilter === f ? 'bg-[#111827] text-white shadow-xs' : 'text-gray-600 hover:text-black'
+                    className={`px-2.5 py-0.5 rounded-full transition-all ${
+                      dutyFilter === f
+                        ? 'bg-[#111827] text-white shadow-xs'
+                        : 'text-[#4B5563] hover:text-[#111827]'
                     }`}
                   >
                     {f}
@@ -273,20 +515,19 @@ export const DriverDetailModal = ({ driver, onClose }) => {
               </div>
             </div>
 
-            {/* Duties List */}
             {filteredTrips.length === 0 ? (
               <div className="bg-white rounded-3xl p-6 border-2 border-[#E5DFD3] text-center space-y-2 shadow-xs">
-                <Car className="w-8 h-8 text-gray-400 mx-auto" />
-                <h5 className="text-xs font-black text-[#111827]">No assigned duties</h5>
-                <p className="text-[11px] text-gray-500 font-semibold">
-                  This driver does not have any {dutyFilter !== 'All' ? dutyFilter.toLowerCase() : ''} trips logged yet.
+                <Calendar className="w-8 h-8 text-gray-400 mx-auto" />
+                <h5 className="text-xs font-black text-[#111827]">No Duties Found</h5>
+                <p className="text-[11px] text-[#4B5563] font-semibold">
+                  This driver has not been assigned to any duties in "{dutyFilter}".
                 </p>
               </div>
             ) : (
               <div className="space-y-2.5">
                 {filteredTrips.map(trip => {
                   const isCompleted = trip.status === 'Completed';
-                  const isOngoing = trip.status === 'Ongoing' || trip.status === 'Driver Assigned';
+                  const isOngoing = trip.status === 'Ongoing' || trip.status === 'Driver Assigned' || trip.status === 'Confirmed';
                   const isCancelled = trip.status === 'Cancelled';
 
                   return (
@@ -295,14 +536,14 @@ export const DriverDetailModal = ({ driver, onClose }) => {
                       onClick={() => handleOpenTrip(trip)}
                       className="bg-white rounded-2xl p-3.5 border-2 border-[#E5DFD3] hover:border-[#111827] cursor-pointer transition-all space-y-2 shadow-xs group"
                     >
-                      {/* Top Bar: Trip ID, Vehicle & Status */}
+                      {/* Top Bar: Trip ID, Type & Status */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
                           <span className="font-mono font-black text-xs text-[#111827] group-hover:text-blue-600">
                             {trip.id}
                           </span>
-                          <span className="text-[10px] bg-blue-50 text-blue-900 font-black px-2 py-0.5 rounded-full border border-blue-200">
-                            🚘 {trip.vehiclePlate?.split(' ')[0] || 'Assigned Car'}
+                          <span className="text-[10px] bg-[#F8F6F0] text-[#374151] font-black px-2 py-0.5 rounded-full border border-[#E5DFD3]">
+                            {trip.tripType || 'Outstation'}
                           </span>
                         </div>
 
@@ -319,38 +560,31 @@ export const DriverDetailModal = ({ driver, onClose }) => {
                         </span>
                       </div>
 
-                      {/* Route */}
-                      <div className="text-xs font-bold text-[#111827] flex items-center gap-1.5">
-                        <span className="truncate">{trip.pickupLocation}</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <span className="truncate text-gray-600">{trip.dropLocation}</span>
+                      {/* Customer & Route */}
+                      <div className="text-xs font-bold text-[#111827] flex items-center justify-between">
+                        <span className="truncate">👤 {trip.customerName}</span>
+                        <span className="text-[11px] text-gray-500 font-semibold">{trip.vehiclePlate?.split(' ')[0]}</span>
                       </div>
 
-                      {/* Passenger & Bata Allowance Row */}
+                      <div className="text-xs font-semibold text-gray-600 flex items-center gap-1.5">
+                        <span className="truncate">{trip.pickupLocation}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span className="truncate">{trip.dropLocation}</span>
+                      </div>
+
+                      {/* Metrics: KM + Bata */}
                       <div className="flex items-center justify-between text-[11px] text-[#4B5563] pt-1 border-t border-gray-100 font-semibold">
-                        <div className="flex items-center gap-2 truncate">
-                          <span>👤 {trip.customerName || 'Passenger'}</span>
-                          <span>•</span>
+                        <div className="flex items-center gap-2">
                           <span>📅 {new Date(trip.startDateTime || trip.createdAt).toLocaleDateString([], { day: 'numeric', month: 'short' })}</span>
+                          <span>•</span>
+                          <span>🛣️ {trip.actualKm || trip.estimatedKm || 120} KM</span>
                         </div>
 
-                        <div className="text-right shrink-0">
-                          <span className="text-xs font-black text-emerald-800 block">
+                        <div className="text-right">
+                          <span className="text-xs font-black text-amber-900 block">
                             Bata: {formatCurrency(trip.driverBata || 400)}
                           </span>
                         </div>
-                      </div>
-
-                      {/* View details prompt */}
-                      <div className="flex items-center justify-between pt-1 border-t border-dashed border-gray-200 text-[11px]">
-                        <span className="text-[#EA580C] font-black group-hover:underline flex items-center gap-0.5">
-                          <span>Inspect Trip Duty Slip</span>
-                          <ChevronRight className="w-3 h-3" />
-                        </span>
-
-                        <span className="text-gray-500 font-mono text-[10px]">
-                          {trip.actualKm || trip.estimatedKm || 150} KM
-                        </span>
                       </div>
                     </div>
                   );
@@ -369,13 +603,13 @@ export const DriverDetailModal = ({ driver, onClose }) => {
             Close
           </button>
 
-          <a
-            href={`tel:${driver.phone}`}
-            className="px-5 py-2.5 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black flex items-center gap-1.5 shadow-md tap-active"
+          <button
+            onClick={handleRenewDl}
+            className="px-5 py-2.5 rounded-full bg-white border-2 border-[#111827] text-[#111827] text-xs font-black flex items-center gap-1.5 hover:bg-gray-50 shadow-sm tap-active"
           >
-            <Phone className="w-3.5 h-3.5 text-[#D4F05B]" />
-            <span>Call Driver Now</span>
-          </a>
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Renew License Document</span>
+          </button>
         </div>
       </div>
     </div>

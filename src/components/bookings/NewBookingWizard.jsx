@@ -16,7 +16,11 @@ import {
   ArrowLeft,
   CheckCircle2,
   FileText,
-  AlertTriangle
+  AlertTriangle,
+  Wand2,
+  Plus,
+  Trash2,
+  ClipboardList
 } from 'lucide-react';
 
 export const NewBookingWizard = ({ onClose }) => {
@@ -31,10 +35,23 @@ export const NewBookingWizard = ({ onClose }) => {
     formatCurrency,
     setWhatsAppData,
     newBookingPrefill,
-    setNewBookingPrefill
+    setNewBookingPrefill,
+    parseWhatsAppBookingText,
+    setInspectionModalBooking
   } = useApp();
 
   const [step, setStep] = useState(1);
+  const [showParserDrawer, setShowParserDrawer] = useState(false);
+  const [rawWhatsAppText, setRawWhatsAppText] = useState('');
+  const [parserSuccess, setParserSuccess] = useState(false);
+
+  // Day-wise itinerary state for multi-day tours
+  const [showItinerary, setShowItinerary] = useState(false);
+  const [itineraryDays, setItineraryDays] = useState([
+    { day: 1, from: 'Pune', to: 'Mahabaleshwar', notes: 'Morning pickup & hotel transfer' },
+    { day: 2, from: 'Mahabaleshwar', to: 'Pratapgad & Viewpoints', notes: 'Full day sightseeing' },
+    { day: 3, from: 'Mahabaleshwar', to: 'Pune', notes: 'Evening return drop' }
+  ]);
 
   // Form State with prefill support
   const [formData, setFormData] = useState({
@@ -240,6 +257,64 @@ export const NewBookingWizard = ({ onClose }) => {
           {/* STEP 1: TRIP TYPE & CUSTOMER */}
           {step === 1 && (
             <div className="space-y-4">
+              {/* Quick WhatsApp Text Parser Drawer */}
+              <div className="bg-white rounded-3xl p-3.5 border-2 border-[#E5DFD3] shadow-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-[#111827]">
+                    <Wand2 className="w-4 h-4 text-[#EA580C]" />
+                    <span>Paste WhatsApp Inquiry</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowParserDrawer(!showParserDrawer)}
+                    className="text-[11px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full tap-active"
+                  >
+                    {showParserDrawer ? 'Hide Parser' : '⚡ Quick Auto-Fill'}
+                  </button>
+                </div>
+
+                {showParserDrawer && (
+                  <div className="space-y-2 pt-1 border-t border-[#E5DFD3] animate-fade-in">
+                    <textarea
+                      rows="3"
+                      placeholder="Paste WhatsApp text message... e.g. 'Pune to Shirdi Innova 2 days, 15 Oct, guest Dr. Deshmukh 9881234567, rate 12500'"
+                      value={rawWhatsAppText}
+                      onChange={e => setRawWhatsAppText(e.target.value)}
+                      className="w-full bg-[#F8F6F0] border border-[#E5DFD3] rounded-2xl p-2.5 text-xs font-medium text-[#111827] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const parsed = parseWhatsAppBookingText(rawWhatsAppText);
+                        if (parsed) {
+                          setFormData(prev => ({
+                            ...prev,
+                            customerName: parsed.customerName || prev.customerName,
+                            customerPhone: parsed.customerPhone || prev.customerPhone,
+                            pickupLocation: parsed.pickupLocation || prev.pickupLocation,
+                            dropLocation: parsed.dropLocation || prev.dropLocation,
+                            tripType: parsed.tripType || prev.tripType,
+                            baseFare: parsed.baseFare || prev.baseFare,
+                            startDateTime: parsed.startDateTime || prev.startDateTime,
+                            endDateTime: parsed.endDateTime || prev.endDateTime,
+                            notes: parsed.notes || prev.notes
+                          }));
+                          setParserSuccess(true);
+                          setTimeout(() => {
+                            setParserSuccess(false);
+                            setShowParserDrawer(false);
+                          }, 1200);
+                        }
+                      }}
+                      className="w-full py-2 rounded-xl bg-[#111827] text-white text-xs font-black flex items-center justify-center gap-1.5 tap-active shadow-xs"
+                    >
+                      {parserSuccess ? <Check className="w-3.5 h-3.5 text-[#D4F05B]" /> : <Sparkles className="w-3.5 h-3.5 text-[#D4F05B]" />}
+                      <span>{parserSuccess ? 'Booking Details Auto-Filled!' : 'Parse & Auto-Fill Form'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="text-xs font-black text-[#111827] uppercase tracking-wider block mb-2">
                   Select Trip Category
@@ -376,6 +451,102 @@ export const NewBookingWizard = ({ onClose }) => {
                   </div>
                 </div>
               </div>
+
+              {/* Multi-Day Outstation Tour Itinerary Planner */}
+              {(formData.tripType === 'Outstation' || formData.tripType === 'Tour') && (
+                <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <ClipboardList className="w-4 h-4 text-[#EA580C]" />
+                      <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">
+                        Multi-Day Tour Itinerary
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowItinerary(!showItinerary)}
+                      className="text-[10px] font-black text-amber-900 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-300 tap-active"
+                    >
+                      {showItinerary ? 'Hide Itinerary' : `+ ${itineraryDays.length} Days Stops`}
+                    </button>
+                  </div>
+
+                  {showItinerary && (
+                    <div className="space-y-2 pt-1 border-t border-[#E5DFD3] animate-fade-in">
+                      {itineraryDays.map((it, idx) => (
+                        <div key={idx} className="p-2.5 bg-[#F8F6F0] rounded-2xl border border-[#E5DFD3] space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-black text-[#111827]">
+                            <span>Day {it.day}: {it.from} ➔ {it.to}</span>
+                            {itineraryDays.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setItineraryDays(prev => prev.filter((_, i) => i !== idx))}
+                                className="text-rose-600 hover:text-rose-800"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <input
+                              type="text"
+                              value={it.from}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setItineraryDays(prev => prev.map((item, i) => i === idx ? { ...item, from: val } : item));
+                              }}
+                              placeholder="From"
+                              className="bg-white border border-[#E5DFD3] rounded-lg px-2 py-1 text-[10px] font-semibold"
+                            />
+                            <input
+                              type="text"
+                              value={it.to}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setItineraryDays(prev => prev.map((item, i) => i === idx ? { ...item, to: val } : item));
+                              }}
+                              placeholder="To"
+                              className="bg-white border border-[#E5DFD3] rounded-lg px-2 py-1 text-[10px] font-semibold"
+                            />
+                          </div>
+                          <input
+                            type="text"
+                            value={it.notes}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setItineraryDays(prev => prev.map((item, i) => i === idx ? { ...item, notes: val } : item));
+                            }}
+                            placeholder="Sightseeing / Hotel note"
+                            className="w-full bg-white border border-[#E5DFD3] rounded-lg px-2 py-1 text-[10px]"
+                          />
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextDay = itineraryDays.length + 1;
+                          const lastTo = itineraryDays[itineraryDays.length - 1]?.to || 'Destination';
+                          setItineraryDays(prev => [
+                            ...prev,
+                            { day: nextDay, from: lastTo, to: formData.dropLocation || 'Next City', notes: 'Sightseeing / Transfer' }
+                          ]);
+                          setFormData(prev => ({
+                            ...prev,
+                            driverBata: nextDay * 400,
+                            nightHalt: (nextDay - 1) * 300,
+                            estimatedKm: Math.max(prev.estimatedKm, nextDay * 250)
+                          }));
+                        }}
+                        className="w-full py-1.5 rounded-xl bg-white border border-dashed border-[#111827] text-[#111827] text-[11px] font-black flex items-center justify-center gap-1 hover:bg-gray-50 tap-active"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Add Next Day Stop</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -469,6 +640,23 @@ export const NewBookingWizard = ({ onClose }) => {
                   ))}
                 </div>
               </div>
+
+              {/* Rental 6-Point Inspection Checklist Trigger */}
+              {formData.tripType === 'Rental' && (
+                <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between shadow-xs">
+                  <div>
+                    <span className="text-[11px] font-black text-amber-950 block">Vehicle Inspection Protocol</span>
+                    <span className="text-[10px] text-amber-800">Record scratch & fuel condition before key handover</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setInspectionModalBooking({ id: 'NEW_RENTAL', vehicleId: formData.vehicleId, vehiclePlate: 'Rental Car' })}
+                    className="px-3 py-1.5 rounded-full bg-[#111827] text-white text-[10px] font-black tap-active shadow-xs"
+                  >
+                    📷 6-Pt Check
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -212,16 +212,34 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
             </div>
           </div>
 
-          {/* Terms & Signature */}
+          {/* Terms & Signatures */}
           <div className="pt-3 border-t border-gray-200 text-[9px] text-gray-500 space-y-1">
             <p>1. Toll, parking and state entry tax as per actual receipts.</p>
-            <p>2. Subject to Pune jurisdiction.</p>
-            <div className="flex justify-between items-end pt-4">
+            <p>2. Subject to {business.city || 'Pune'} jurisdiction.</p>
+            
+            <div className="flex justify-between items-end pt-3">
               <div>
                 <p className="font-bold text-gray-800">For {business.name}</p>
-                <p className="text-[8px]">Authorized Signatory</p>
+                <p className="text-[8px]">Authorized Fleet Signatory</p>
               </div>
-              <div className="w-24 border-b border-gray-400"></div>
+
+              <div className="text-right flex flex-col items-end">
+                {booking.customerSignature ? (
+                  <div className="space-y-0.5">
+                    <img
+                      src={booking.customerSignature}
+                      alt="Customer Signature"
+                      className="h-9 max-w-[100px] object-contain border-b border-gray-800"
+                    />
+                    <p className="text-[8px] font-bold text-gray-800">Customer Digital Sign</p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="w-24 border-b border-gray-400 mb-1"></div>
+                    <p className="text-[8px]">Customer Signature</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

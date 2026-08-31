@@ -15,6 +15,7 @@ import {
 export const WhatsAppModal = ({ data, onClose }) => {
   const { business, formatCurrency } = useApp();
   const [copied, setCopied] = useState(false);
+  const [reminderStage, setReminderStage] = useState(data.reminderStage || 1); // 1 | 2 | 3
 
   if (!data) return null;
 
@@ -57,14 +58,32 @@ export const WhatsAppModal = ({ data, onClose }) => {
     }
 
     if (type === 'reminder') {
-      return `*💳 PAYMENT DUE REMINDER - ${business.name.toUpperCase()}*\n\n` +
-        `Dear *${c.name}*,\n\n` +
-        `This is a gentle reminder regarding your outstanding balance with ${business.name}.\n\n` +
-        `💰 *Outstanding Balance:* ${formatCurrency(c.pendingBalance)}\n` +
-        `⚡ *UPI ID:* ${business.upiId}\n\n` +
-        `Please clear the pending dues via UPI or Bank Transfer.\n` +
-        `For questions, reply to this message or call ${business.phone}.\n\n` +
-        `_Thank you for your business!_`;
+      const balance = c.pendingBalance || b.balancePending || 2400;
+      if (reminderStage === 1) {
+        // Stage 1: Gentle Friendly Check-in
+        return `*💳 GENTLE PAYMENT REMINDER - ${business.name.toUpperCase()}*\n\n` +
+          `Hello *${targetName}*,\n\n` +
+          `Hope you had a comfortable journey with us! This is a gentle reminder regarding your pending trip balance of *${formatCurrency(balance)}*.\n\n` +
+          `⚡ *UPI ID:* ${business.upiId || 'ramesh.tours@okhdfcbank'}\n` +
+          `Kindly clear the balance at your earliest convenience. Thank you!`;
+      } else if (reminderStage === 2) {
+        // Stage 2: Due Today
+        return `*📢 PAYMENT DUE TODAY - ${business.name.toUpperCase()}*\n\n` +
+          `Dear *${targetName}*,\n\n` +
+          `Your invoice balance of *${formatCurrency(balance)}* is scheduled for clearance today.\n\n` +
+          `⚡ *UPI Payment:* ${business.upiId || 'ramesh.tours@okhdfcbank'}\n` +
+          `🏦 *Bank A/C:* HDFC Bank | A/C: 50200012345678 | IFSC: HDFC0001234\n\n` +
+          `Please share a screenshot once payment is completed.\n` +
+          `📞 *Accounts Dept:* ${business.phone}`;
+      } else {
+        // Stage 3: Overdue Statement of Account
+        return `*⚠️ OVERDUE STATEMENT OF ACCOUNT - ${business.name.toUpperCase()}*\n\n` +
+          `Dear *${targetName}*,\n\n` +
+          `This is a formal notice regarding your overdue balance of *${formatCurrency(balance)}* pending across past trips.\n\n` +
+          `Kindly settle this amount immediately via UPI (${business.upiId || 'ramesh.tours@okhdfcbank'}) or NEFT.\n` +
+          `If already paid, please ignore this message.\n\n` +
+          `_Office Accounts, ${business.name}_ • ${business.phone}`;
+      }
     }
 
     if (type === 'invoice') {
@@ -139,11 +158,40 @@ export const WhatsAppModal = ({ data, onClose }) => {
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[#111827] hover:bg-gray-200 tap-active"
+            className="w-8 h-8 rounded-full bg-white border border-[#E5DFD3] flex items-center justify-center text-gray-500 hover:bg-gray-100 tap-active shadow-xs"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* 3-Stage Template Selector for Dues */}
+        {type === 'reminder' && (
+          <div className="space-y-1 bg-white p-2.5 rounded-2xl border border-[#E5DFD3]">
+            <span className="text-[10px] font-black text-[#4B5563] uppercase tracking-wider block">
+              Select Dues Recovery Stage:
+            </span>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { stage: 1, label: '1. Polite 💬' },
+                { stage: 2, label: '2. Due Today 📢' },
+                { stage: 3, label: '3. Overdue ⚠️' },
+              ].map(s => (
+                <button
+                  key={s.stage}
+                  type="button"
+                  onClick={() => setReminderStage(s.stage)}
+                  className={`py-1.5 rounded-xl text-[10px] font-black transition tap-active ${
+                    reminderStage === s.stage
+                      ? 'bg-[#111827] text-white shadow-xs'
+                      : 'bg-[#F8F6F0] text-[#4B5563] border border-[#E5DFD3]'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Message Preview in WhatsApp Green Bubble */}
         <div className="bg-[#E7F7ED] rounded-3xl p-3.5 border border-emerald-300 space-y-2 text-xs font-mono text-[#111827] max-h-64 overflow-y-auto no-scrollbar shadow-inner leading-relaxed whitespace-pre-wrap">

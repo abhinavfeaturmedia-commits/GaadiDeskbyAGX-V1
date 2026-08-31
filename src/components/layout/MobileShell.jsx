@@ -21,12 +21,15 @@ export const MobileShell = ({ children }) => {
     setActiveTab,
     setIsNewBookingOpen,
     getDocumentAlerts,
+    getUnreadNotificationCount,
     setIsNotificationsOpen,
-    setIsMembershipOpen
+    setIsMembershipOpen,
+    quickDriverLogin
   } = useApp();
 
-  const alerts = getDocumentAlerts();
-  const urgentAlertsCount = alerts.filter(a => a.isUrgent || a.isExpired).length;
+  const notifCounts = getUnreadNotificationCount ? getUnreadNotificationCount() : { total: 0, urgent: 0 };
+  const badgeCount = notifCounts.total;
+  const isUrgent = notifCounts.urgent > 0;
 
   return (
     <div className="phone-shell font-sans text-text-primary bg-canvas selection:bg-accent-peach selection:text-white">
@@ -57,7 +60,7 @@ export const MobileShell = ({ children }) => {
           </div>
         </div>
 
-        {/* Right: Language Switcher & Alert Bell */}
+        {/* Right: Language Switcher, Driver View Switcher & Alert Bell */}
         <div className="flex items-center space-x-2">
           {/* Language Toggle Pill */}
           <button
@@ -69,15 +72,27 @@ export const MobileShell = ({ children }) => {
             <span className="text-[11px] font-extrabold">{language === 'en' ? 'हिन्दी' : 'ENG'}</span>
           </button>
 
+          {/* Quick Switch to Driver Mode (Demo/Testing Helper) */}
+          <button
+            onClick={() => quickDriverLogin('drv-01')}
+            className="w-9 h-9 rounded-full bg-emerald-50 border border-emerald-300 shadow-soft flex items-center justify-center text-emerald-950 hover:bg-emerald-100 tap-active"
+            title="Switch to Driver Mode (Demo)"
+          >
+            <span className="text-xs">🚗</span>
+          </button>
+
           {/* Notifications / Expiry Alerts */}
           <button
             onClick={() => setIsNotificationsOpen(true)}
             className="relative w-9 h-9 rounded-full bg-white border border-card-border shadow-soft flex items-center justify-center text-gray-800 hover:bg-gray-50 tap-active"
+            title="Notifications"
           >
             <Bell className="w-4 h-4" />
-            {urgentAlertsCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center badge-pulse shadow-xs">
-                {urgentAlertsCount}
+            {badgeCount > 0 && (
+              <span className={`absolute -top-1 -right-1 w-4 h-4 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center shadow-xs ${
+                isUrgent ? 'bg-red-500 badge-pulse' : 'bg-[#111827]'
+              }`}>
+                {badgeCount}
               </span>
             )}
           </button>

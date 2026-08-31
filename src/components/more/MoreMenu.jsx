@@ -16,7 +16,12 @@ import {
   CheckCircle2,
   X,
   LogOut,
-  UserCheck
+  UserCheck,
+  Globe,
+  FileSpreadsheet,
+  Zap,
+  Shield,
+  Sparkles
 } from 'lucide-react';
 import { PapersReminder } from '../papers/PapersReminder';
 import { CustomerDriverCRM } from '../crm/CustomerDriverCRM';
@@ -32,10 +37,16 @@ export const MoreMenu = () => {
     setRateCards,
     setIsMembershipOpen,
     formatCurrency,
+    formatPhoneNumber,
     authUser,
     logoutUser,
     moreSubView,
-    setMoreSubView
+    setMoreSubView,
+    setIsQuickQuoteOpen,
+    setIsCaExportOpen,
+    setIsPublicSiteOpen,
+    currentStaffRole,
+    switchStaffRole
   } = useApp();
 
   const [activeSubView, setActiveSubView] = useState(moreSubView || null); // 'papers' | 'crm' | 'ratecards' | 'business'
@@ -423,6 +434,85 @@ export const MoreMenu = () => {
           <ChevronRight className="w-4 h-4 text-gray-400" />
         </div>
 
+        {/* Public Mini-Website Showcase & Lead Capture */}
+        <div
+          onClick={() => setIsPublicSiteOpen(true)}
+          className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-emerald-50/50 rounded-2xl transition-all tap-active"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-800 font-bold text-xs">
+              <Globe className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h4 className="text-xs font-black text-[#111827]">Operator Public Mini-Website</h4>
+                <span className="text-[9px] bg-emerald-100 text-emerald-900 font-black px-1.5 py-0.2 rounded-md">LIVE</span>
+              </div>
+              <p className="text-[10px] text-[#4B5563] font-semibold">Share your branded vehicle catalog & rates link</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+        </div>
+
+        {/* 10-Second Quick Quotation Generator */}
+        <div
+          onClick={() => setIsQuickQuoteOpen(true)}
+          className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-amber-50/50 rounded-2xl transition-all tap-active"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-800 font-bold text-xs">
+              <Zap className="w-4 h-4 text-[#EA580C]" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-[#111827]">10-Second Quick Quotation</h4>
+              <p className="text-[10px] text-[#4B5563] font-semibold">Instant branded PDF & WhatsApp fare estimates</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+        </div>
+
+        {/* CA & Tally Export Suite */}
+        <div
+          onClick={() => setIsCaExportOpen(true)}
+          className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-blue-50/50 rounded-2xl transition-all tap-active"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-800 font-bold text-xs">
+              <FileSpreadsheet className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-[#111827]">CA & Tally Export Suite</h4>
+              <p className="text-[10px] text-[#4B5563] font-semibold">1-Click GSTR-1, Expense Ledger & Khata CSV</p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+        </div>
+
+        {/* Staff Role Permissions (RBAC) */}
+        <div
+          onClick={() => {
+            const nextRole = currentStaffRole === 'Owner' ? 'Manager' : currentStaffRole === 'Manager' ? 'Accountant' : currentStaffRole === 'Accountant' ? 'Dispatcher' : 'Owner';
+            switchStaffRole(nextRole);
+          }}
+          className="p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50 rounded-2xl transition-all tap-active"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-800 font-bold text-xs">
+              <Shield className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h4 className="text-xs font-black text-[#111827]">Staff Role / Access Mode</h4>
+                <span className="text-[9px] bg-[#111827] text-white font-black px-1.5 py-0.2 rounded-md uppercase">
+                  {currentStaffRole || 'Owner'}
+                </span>
+              </div>
+              <p className="text-[10px] text-[#4B5563] font-semibold">Owner, Manager, Accountant, Dispatcher (Tap to switch)</p>
+            </div>
+          </div>
+          <span className="text-[10px] font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">Switch</span>
+        </div>
+
         {/* Business Profile Settings */}
         <div
           onClick={() => handleSubViewChange('business')}
@@ -470,7 +560,7 @@ export const MoreMenu = () => {
                 {authUser?.name || business.ownerName}
               </h4>
               <p className="text-[10px] text-[#4B5563] font-semibold">
-                +91 {authUser?.phone || business.phone} • {authUser?.isDemo ? 'Demo Mode' : (authUser?.membershipStatus || 'Active')}
+                {formatPhoneNumber(authUser?.phone || business.phone)} • {authUser?.isDemo ? 'Demo Mode' : (authUser?.membershipStatus || 'Active')}
               </p>
             </div>
           </div>

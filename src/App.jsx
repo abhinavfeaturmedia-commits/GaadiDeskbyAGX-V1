@@ -19,11 +19,29 @@ import { MembershipPlans } from './components/membership/MembershipPlans';
 import { LandingPage } from './components/landing/LandingPage';
 import { AuthModal } from './components/auth/AuthModal';
 
+// Next-Gen Fleet Feature Modals
+import { QuickQuoteModal } from './components/quotes/QuickQuoteModal';
+import { CorporateInvoiceModal } from './components/corporate/CorporateInvoiceModal';
+import { CAExportModal } from './components/export/CAExportModal';
+import { PublicMiniSiteModal } from './components/publicsite/PublicMiniSiteModal';
+import { VehicleServiceModal } from './components/fleet/VehicleServiceModal';
+import { VehicleInspectionModal } from './components/inspection/VehicleInspectionModal';
+
+// Driver Views & Modals
+import { DriverShell } from './components/driver/DriverShell';
+import { DriverDashboard } from './components/driver/DriverDashboard';
+import { DriverTripHistory } from './components/driver/DriverTripHistory';
+import { DriverCashWallet } from './components/driver/DriverCashWallet';
+import { DriverProfile } from './components/driver/DriverProfile';
+import { DriverTollModal } from './components/driver/DriverTollModal';
+import { DriverUpiModal } from './components/driver/DriverUpiModal';
+
 const MainContent = () => {
   const [showSplash, setShowSplash] = useState(true);
   const {
     authUser,
     activeTab,
+    driverActiveTab,
     isNewBookingOpen,
     setIsNewBookingOpen,
     isNotificationsOpen,
@@ -37,7 +55,20 @@ const MainContent = () => {
     selectedTripDetailBooking,
     setSelectedTripDetailBooking,
     whatsAppData,
-    setWhatsAppData
+    setWhatsAppData,
+    isQuickQuoteOpen,
+    setIsQuickQuoteOpen,
+    selectedCorporateCustomer,
+    setSelectedCorporateCustomer,
+    isCaExportOpen,
+    setIsCaExportOpen,
+    isPublicSiteOpen,
+    setIsPublicSiteOpen,
+    serviceModalVehicle,
+    setServiceModalVehicle,
+    inspectionModalBooking,
+    setInspectionModalBooking,
+    saveVehicleInspection
   } = useApp();
 
   return (
@@ -55,8 +86,27 @@ const MainContent = () => {
             <MembershipPlans onClose={() => setIsMembershipOpen(false)} />
           )}
         </>
+      ) : authUser.role === 'driver' ? (
+        /* If user is a Driver, show dedicated DriverShell & Driver Views */
+        <DriverShell>
+          {driverActiveTab === 'duty' && <DriverDashboard />}
+          {driverActiveTab === 'trips' && <DriverTripHistory />}
+          {driverActiveTab === 'wallet' && <DriverCashWallet />}
+          {driverActiveTab === 'profile' && <DriverProfile />}
+
+          {/* Driver On-Road Toll & UPI Modals */}
+          <DriverTollModal />
+          <DriverUpiModal />
+
+          {/* Driver Notifications */}
+          {isNotificationsOpen && (
+            <NotificationModal
+              onClose={() => setIsNotificationsOpen(false)}
+            />
+          )}
+        </DriverShell>
       ) : (
-        /* If user is logged in, show the full GaadiDesk App Shell & Dashboard */
+        /* If user is Fleet Owner / Staff, show full GaadiDesk App Shell & Dashboard */
         <MobileShell>
           {/* Tab Router */}
           {activeTab === 'home' && <HomeDashboard />}
@@ -115,6 +165,46 @@ const MainContent = () => {
 
           {/* Customer Dues Settlement Modal */}
           <CustomerSettleModal />
+
+          {/* 10-Second Instant Quotation Modal */}
+          {isQuickQuoteOpen && (
+            <QuickQuoteModal onClose={() => setIsQuickQuoteOpen(false)} />
+          )}
+
+          {/* Corporate B2B Monthly Invoicing Modal */}
+          {selectedCorporateCustomer && (
+            <CorporateInvoiceModal
+              customer={selectedCorporateCustomer}
+              onClose={() => setSelectedCorporateCustomer(null)}
+            />
+          )}
+
+          {/* CA & Tally Export Modal */}
+          {isCaExportOpen && (
+            <CAExportModal onClose={() => setIsCaExportOpen(false)} />
+          )}
+
+          {/* Operator Branded Public Mini-Website Modal */}
+          {isPublicSiteOpen && (
+            <PublicMiniSiteModal onClose={() => setIsPublicSiteOpen(false)} />
+          )}
+
+          {/* Odometer Vehicle Maintenance & Service Modal */}
+          {serviceModalVehicle && (
+            <VehicleServiceModal
+              vehicle={serviceModalVehicle}
+              onClose={() => setServiceModalVehicle(null)}
+            />
+          )}
+
+          {/* 6-Point Vehicle Rental Inspection Modal */}
+          {inspectionModalBooking && (
+            <VehicleInspectionModal
+              booking={inspectionModalBooking}
+              onSave={(data) => saveVehicleInspection(inspectionModalBooking.id, data)}
+              onClose={() => setInspectionModalBooking(null)}
+            />
+          )}
 
           {/* Global Auth Modal */}
           <AuthModal />

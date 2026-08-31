@@ -28,6 +28,7 @@ export const MembershipPlans = ({ onClose }) => {
       name: 'Starter Plan',
       vehicles: 5,
       staff: 1,
+      driverLogins: 5,
       monthlyPrice: 499,
       yearlyPrice: 4999,
       description: 'Ideal for small owner-drivers & fleets',
@@ -38,6 +39,7 @@ export const MembershipPlans = ({ onClose }) => {
       name: 'Growth Plan',
       vehicles: 15,
       staff: 3,
+      driverLogins: 15,
       monthlyPrice: 1499,
       yearlyPrice: 14999,
       description: 'Typical city cab & outstation operator',
@@ -48,6 +50,7 @@ export const MembershipPlans = ({ onClose }) => {
       name: 'Business Fleet',
       vehicles: 40,
       staff: 8,
+      driverLogins: 40,
       monthlyPrice: 2999,
       yearlyPrice: 29999,
       description: 'Multi-driver agency with high volume',
@@ -58,6 +61,7 @@ export const MembershipPlans = ({ onClose }) => {
       name: 'Agency Enterprise',
       vehicles: 100,
       staff: 15,
+      driverLogins: 100,
       monthlyPrice: 4999,
       yearlyPrice: 49999,
       description: 'Large travel agency & rental mix',
@@ -216,6 +220,10 @@ export const MembershipPlans = ({ onClose }) => {
                         <div className="flex items-center space-x-1.5">
                           <Check className="w-3.5 h-3.5 text-green-600 shrink-0" />
                           <span>Up to <b>{plan.vehicles} Vehicles</b> in Fleet</span>
+                        </div>
+                        <div className="flex items-center space-x-1.5">
+                          <Check className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                          <span><b>{plan.driverLogins || plan.vehicles} Driver Logins</b> & Live Duty Cockpit</span>
                         </div>
                         <div className="flex items-center space-x-1.5">
                           <Check className="w-3.5 h-3.5 text-green-600 shrink-0" />

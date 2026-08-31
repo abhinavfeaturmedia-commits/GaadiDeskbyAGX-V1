@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { SignaturePad } from '../signature/SignaturePad';
 import {
   X,
   CheckCircle2,
@@ -12,7 +13,8 @@ import {
   User,
   Sparkles,
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  PenTool
 } from 'lucide-react';
 
 export const TripSettlementModal = ({ booking, onClose }) => {
@@ -22,7 +24,8 @@ export const TripSettlementModal = ({ booking, onClose }) => {
     completeTripAndSettle,
     formatCurrency,
     setSelectedInvoiceBooking,
-    setWhatsAppData
+    setWhatsAppData,
+    setInspectionModalBooking
   } = useApp();
 
   const vehicle = vehicles.find(v => v.id === booking.vehicleId);
@@ -37,6 +40,8 @@ export const TripSettlementModal = ({ booking, onClose }) => {
   const [discount, setDiscount] = useState(0);
   const [paymentMode, setPaymentMode] = useState('Cash'); // 'Cash' | 'UPI' | 'Bank' | 'Credit'
   const [notes, setNotes] = useState('');
+  const [customerSignature, setCustomerSignature] = useState(booking.customerSignature || null);
+  const [showSignPad, setShowSignPad] = useState(false);
 
   // Calculations
   const actualKm = Math.max(0, Number(endKm) - Number(startKm));
@@ -72,6 +77,7 @@ export const TripSettlementModal = ({ booking, onClose }) => {
       finalPaidAmount: Number(collectedNow),
       settlementPaymentMode: paymentMode,
       settlementNotes: notes || `Meter settled: ${startKm} KM to ${endKm} KM (${actualKm} KM total)`,
+      customerSignature,
       balanceRemaining
     };
 
@@ -220,6 +226,54 @@ export const TripSettlementModal = ({ booking, onClose }) => {
                 className="w-full bg-[#F8F6F0] border border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none"
               />
             </div>
+          </div>
+
+          {/* Rental 6-Point Return Inspection Check */}
+          {booking.tripType === 'Rental' && (
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between shadow-xs">
+              <div>
+                <span className="text-[11px] font-black text-amber-950 block">Return Vehicle Inspection</span>
+                <span className="text-[10px] text-amber-800">Check fuel level & verify return condition</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setInspectionModalBooking(booking)}
+                className="px-3 py-1.5 rounded-full bg-[#111827] text-white text-[10px] font-black tap-active shadow-xs"
+              >
+                📷 Inspect Car
+              </button>
+            </div>
+          )}
+
+          {/* Touchscreen Digital Signature Drawer */}
+          <div className="bg-white rounded-3xl p-3.5 border-2 border-[#E5DFD3] shadow-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <PenTool className="w-4 h-4 text-[#EA580C]" />
+                <span className="text-xs font-black text-[#111827]">Customer Duty Signature</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSignPad(!showSignPad)}
+                className={`text-[10px] font-black px-2.5 py-1 rounded-full border transition tap-active ${
+                  customerSignature
+                    ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                    : 'bg-[#F8F6F0] text-[#111827] border-[#E5DFD3]'
+                }`}
+              >
+                {customerSignature ? 'Signed ✅ (Change)' : showSignPad ? 'Hide Pad' : '✍️ Take Sign'}
+              </button>
+            </div>
+
+            {showSignPad && (
+              <div className="pt-2 border-t border-[#E5DFD3] animate-fade-in">
+                <SignaturePad
+                  initialSignature={customerSignature}
+                  onSave={(dataUrl) => setCustomerSignature(dataUrl)}
+                  label="Customer Sign Pad"
+                />
+              </div>
+            )}
           </div>
 
           {/* Final Billing & Payment Collection */}

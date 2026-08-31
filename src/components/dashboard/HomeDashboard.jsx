@@ -19,7 +19,9 @@ import {
   Calendar,
   AlertTriangle,
   Play,
-  Gauge
+  Gauge,
+  Zap,
+  Wrench
 } from 'lucide-react';
 import { FleetHealthRingWidget } from './FleetHealthRingWidget';
 
@@ -32,6 +34,8 @@ export const HomeDashboard = () => {
     drivers,
     bookings,
     getDocumentAlerts,
+    getServiceAlerts,
+    getSmartNotifications,
     getFinancialStats,
     getFleetStats,
     setActiveTab,
@@ -43,12 +47,17 @@ export const HomeDashboard = () => {
     setSelectedInvoiceBooking,
     setSettlementBooking,
     setSelectedTripDetailBooking,
+    setIsQuickQuoteOpen,
+    setServiceModalVehicle,
     formatCurrency
   } = useApp();
 
   const financialStats = getFinancialStats();
   const fleetStats = getFleetStats();
-  const alerts = getDocumentAlerts();
+  const smartNotifs = getSmartNotifications ? getSmartNotifications() : [];
+  const urgentSmartNotifs = smartNotifs.filter(n => (n.severity === 'critical' || n.severity === 'urgent') && !n.isRead);
+  const primaryAlert = urgentSmartNotifs[0] || smartNotifs.find(n => !n.isRead);
+  const totalUnreadNotifs = smartNotifs.filter(n => !n.isRead).length;
 
   // Find current on-trip or ongoing bookings
   const ongoingTrips = bookings.filter(b => b.status === 'Ongoing');
@@ -80,14 +89,24 @@ export const HomeDashboard = () => {
 
   return (
     <div className="space-y-4 pt-1 animate-fade-in">
-      {/* 1. Expressive Headline */}
-      <div className="space-y-0.5 pt-1">
-        <h1 className="text-2xl font-black text-[#111827] tracking-tight leading-snug">
-          {t('headerTitle')}
-        </h1>
-        <p className="text-xs text-[#4B5563] font-semibold">
-          {business.name} • {business.city} ({vehicles.length} Fleet Cars)
-        </p>
+      {/* 1. Expressive Headline + Quick Action */}
+      <div className="flex items-center justify-between pt-1">
+        <div className="space-y-0.5">
+          <h1 className="text-2xl font-black text-[#111827] tracking-tight leading-snug">
+            {t('headerTitle')}
+          </h1>
+          <p className="text-xs text-[#4B5563] font-semibold">
+            {business.name} • {business.city} ({vehicles.length} Fleet Cars)
+          </p>
+        </div>
+
+        <button
+          onClick={() => setIsQuickQuoteOpen(true)}
+          className="px-3.5 py-1.5 rounded-full bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs font-black flex items-center gap-1.5 shadow-xs hover:bg-amber-100 tap-active"
+        >
+          <Zap className="w-3.5 h-3.5 text-[#EA580C]" />
+          <span>Quick Quote</span>
+        </button>
       </div>
 
       {/* 2. Pill Filter Tabs */}
@@ -117,27 +136,84 @@ export const HomeDashboard = () => {
         })}
       </div>
 
-      {/* 3. Document Expiry Alert Banner (if any) */}
-      {alerts.length > 0 && (
+      {/* 3. Smart Radar Alert Banner (if any unread alerts) */}
+      {primaryAlert && (
         <div
           onClick={() => setIsNotificationsOpen(true)}
-          className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-3.5 flex items-center justify-between cursor-pointer shadow-xs tap-active"
+          className={`border-2 rounded-3xl p-3.5 flex items-center justify-between cursor-pointer shadow-xs tap-active transition-all ${
+            primaryAlert.severity === 'critical'
+              ? 'bg-rose-50 border-rose-300'
+              : primaryAlert.severity === 'urgent'
+              ? 'bg-amber-50 border-amber-300'
+              : primaryAlert.category === 'trips'
+              ? 'bg-blue-50 border-blue-200'
+              : primaryAlert.category === 'money'
+              ? 'bg-emerald-50 border-emerald-200'
+              : 'bg-yellow-50 border-yellow-200'
+          }`}
         >
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-2xl bg-amber-200 flex items-center justify-center text-amber-900 font-bold">
-              <ShieldAlert className="w-5 h-5 text-amber-900" />
+            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold ${
+              primaryAlert.severity === 'critical'
+                ? 'bg-rose-200 text-rose-900'
+                : primaryAlert.severity === 'urgent'
+                ? 'bg-amber-200 text-amber-900'
+                : primaryAlert.category === 'trips'
+                ? 'bg-blue-200 text-blue-900'
+                : primaryAlert.category === 'money'
+                ? 'bg-emerald-200 text-emerald-900'
+                : 'bg-yellow-200 text-yellow-900'
+            }`}>
+              {primaryAlert.severity === 'critical' ? (
+                <AlertTriangle className="w-5 h-5" />
+              ) : primaryAlert.category === 'trips' ? (
+                <Car className="w-5 h-5" />
+              ) : primaryAlert.category === 'money' ? (
+                <IndianRupee className="w-5 h-5" />
+              ) : (
+                <ShieldAlert className="w-5 h-5" />
+              )}
             </div>
             <div>
-              <p className="text-xs font-black text-amber-950">
-                {alerts[0].vehiclePlate || alerts[0].driverName} ({alerts[0].docType})
+              <p className="text-xs font-black text-[#111827]">
+                {primaryAlert.title}
               </p>
-              <p className="text-[11px] text-amber-800 font-bold">
-                {alerts[0].isExpired ? '⚠️ RTO Document EXPIRED' : `⏳ ${alerts[0].daysLeft} days left to renew`}
+              <p className="text-[11px] text-[#4B5563] font-bold line-clamp-1">
+                {primaryAlert.subtitle}
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2.5 py-1 rounded-full shadow-xs">
-            {alerts.length} Alerts
+          <span className={`text-[10px] font-black px-2.5 py-1 rounded-full shadow-xs shrink-0 ${
+            primaryAlert.severity === 'critical' || primaryAlert.severity === 'urgent'
+              ? 'bg-red-500 text-white animate-pulse'
+              : 'bg-[#111827] text-white'
+          }`}>
+            {totalUnreadNotifs} {totalUnreadNotifs === 1 ? 'Alert' : 'Alerts'}
+          </span>
+        </div>
+      )}
+
+      {/* 4. Periodic Maintenance Overdue Alert Banner (if any) */}
+      {serviceAlerts.some(sa => sa.isOverdue) && (
+        <div
+          onClick={() => openMoreSubView('papers')}
+          className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-3.5 flex items-center justify-between cursor-pointer shadow-xs tap-active"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-2xl bg-rose-200 flex items-center justify-center text-rose-900 font-bold">
+              <Wrench className="w-5 h-5 text-rose-900" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-rose-950">
+                Car Service Overdue: {serviceAlerts.find(sa => sa.isOverdue)?.vehiclePlate}
+              </p>
+              <p className="text-[11px] text-rose-800 font-bold">
+                Odometer service interval exceeded. Tap to log workshop invoice.
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-black bg-rose-200 text-rose-950 px-2.5 py-1 rounded-full shadow-xs">
+            Service Due
           </span>
         </div>
       )}

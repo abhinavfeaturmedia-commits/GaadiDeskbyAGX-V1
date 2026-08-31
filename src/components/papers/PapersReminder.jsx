@@ -13,8 +13,9 @@ import {
 } from 'lucide-react';
 
 export const PapersReminder = () => {
-  const { t, vehicles, drivers, getDocumentAlerts, setRenewalModalData } = useApp();
+  const { t, vehicles, drivers, getDocumentAlerts, getServiceAlerts, setRenewalModalData, setServiceModalVehicle } = useApp();
   const alerts = getDocumentAlerts();
+  const serviceAlerts = getServiceAlerts ? getServiceAlerts() : [];
 
   return (
     <div className="space-y-4 pt-1 animate-fade-in">
@@ -24,14 +25,14 @@ export const PapersReminder = () => {
           {t('expiryAlertTitle')}
         </h2>
         <p className="text-xs text-[#4B5563] font-semibold">
-          Track Insurance, PUC, Fitness, Permits & DLs before expiry
+          Track Insurance, PUC, Fitness, Permits, DLs & Periodic Maintenance
         </p>
       </div>
 
       {/* Urgent Expiry Cards */}
       <div className="space-y-2.5">
         <h3 className="text-xs font-black text-[#111827] uppercase tracking-wider">
-          Urgent Renewals (&lt; 30 Days)
+          Urgent RTO Renewals (&lt; 30 Days)
         </h3>
 
         {alerts.length === 0 ? (
@@ -90,6 +91,60 @@ export const PapersReminder = () => {
                   className="px-3 py-1.5 rounded-full bg-[#111827] text-white text-[10px] font-black shadow-xs hover:bg-black tap-active"
                 >
                   Renew
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Periodic Maintenance & Service Alerts */}
+      <div className="space-y-2.5">
+        <h3 className="text-xs font-black text-[#111827] uppercase tracking-wider flex items-center justify-between">
+          <span>Periodic Mechanical Service Alerts</span>
+          <span className="text-[10px] text-[#4B5563] font-bold">Odometer Threshold</span>
+        </h3>
+
+        {serviceAlerts.length === 0 ? (
+          <div className="bg-white rounded-3xl p-4 text-center border-2 border-[#E5DFD3] shadow-xs">
+            <p className="text-xs font-bold text-emerald-800">✅ All fleet mechanical services & oil changes are on track!</p>
+          </div>
+        ) : (
+          serviceAlerts.map((sa, idx) => (
+            <div
+              key={idx}
+              className={`rounded-3xl p-3.5 border-2 flex items-center justify-between shadow-xs ${
+                sa.isOverdue ? 'bg-rose-50/90 border-rose-300' : 'bg-amber-50/90 border-amber-300'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-black text-xs ${
+                  sa.isOverdue ? 'bg-rose-200 text-rose-900' : 'bg-amber-200 text-amber-900'
+                }`}>
+                  🔧
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-[#111827]">{sa.vehiclePlate}</h4>
+                  <p className="text-[11px] text-[#374151] font-bold">
+                    {sa.serviceType} • Odo: <b>{sa.currentOdometer.toLocaleString()} KM</b>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${
+                  sa.isOverdue ? 'bg-rose-200 text-rose-950' : 'bg-amber-200 text-amber-950'
+                }`}>
+                  {sa.isOverdue ? 'OVERDUE' : `${sa.kmRemaining.toLocaleString()} KM left`}
+                </span>
+                <button
+                  onClick={() => {
+                    const targetV = vehicles.find(v => v.id === sa.vehicleId);
+                    if (targetV) setServiceModalVehicle(targetV);
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-[#111827] text-white text-[10px] font-black shadow-xs hover:bg-black tap-active"
+                >
+                  Log Service
                 </button>
               </div>
             </div>

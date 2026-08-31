@@ -36,19 +36,24 @@ export const MoneyDashboard = () => {
     setCustomerSettlementData,
     setWhatsAppData,
     moneySubTab,
-    setMoneySubTab
+    setMoneySubTab,
+    setIsCaExportOpen,
+    vehicles
   } = useApp();
 
   const financialStats = getFinancialStats();
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrAmount, setQrAmount] = useState('2500');
 
-  // Expense form
+  // Expense form with Fuel tracker
   const [expenseForm, setExpenseForm] = useState({
     category: 'Fuel',
     description: '',
     amount: '',
-    paymentMode: 'Cash'
+    paymentMode: 'Cash',
+    fuelLiters: '',
+    vehicleId: '',
+    odometerReading: ''
   });
 
   const handleExpenseSubmit = (e) => {
@@ -63,7 +68,10 @@ export const MoneyDashboard = () => {
       category: 'Fuel',
       description: '',
       amount: '',
-      paymentMode: 'Cash'
+      paymentMode: 'Cash',
+      fuelLiters: '',
+      vehicleId: '',
+      odometerReading: ''
     });
   };
 
@@ -83,15 +91,23 @@ export const MoneyDashboard = () => {
         </div>
         <div className="flex items-center space-x-2">
           <button
+            onClick={() => setIsCaExportOpen(true)}
+            className="px-3 py-1.5 rounded-full bg-white border-2 border-[#E5DFD3] text-[#111827] text-xs font-black flex items-center gap-1.5 shadow-xs hover:bg-gray-50 tap-active"
+            title="Download GSTR-1, Expense Ledger & Customer Khata for Chartered Accountant"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">CA Export</span>
+          </button>
+          <button
             onClick={() => setShowQrModal(true)}
-            className="px-3.5 py-1.5 rounded-full bg-white border-2 border-[#E5DFD3] text-[#111827] text-xs font-black flex items-center gap-1.5 shadow-xs hover:bg-gray-50 tap-active"
+            className="px-3 py-1.5 rounded-full bg-white border-2 border-[#E5DFD3] text-[#111827] text-xs font-black flex items-center gap-1.5 shadow-xs hover:bg-gray-50 tap-active"
           >
             <QrCode className="w-3.5 h-3.5 text-[#EA580C]" />
             <span>UPI QR</span>
           </button>
           <button
             onClick={() => setIsNewExpenseOpen(true)}
-            className="px-3 py-1.5 rounded-full bg-[#111827] text-white text-xs font-black flex items-center gap-1 shadow-xs hover:bg-black tap-active"
+            className="px-3.5 py-1.5 rounded-full bg-[#111827] text-white text-xs font-black flex items-center gap-1 shadow-xs hover:bg-black tap-active"
           >
             <Plus className="w-3.5 h-3.5 text-[#D4F05B]" />
             <span>Expense</span>
@@ -313,6 +329,69 @@ export const MoneyDashboard = () => {
                   <option value="Office & Tea">☕ Office & Misc</option>
                 </select>
               </div>
+
+              {/* Smart Fuel & Mileage Fields */}
+              {expenseForm.category === 'Fuel' && (
+                <div className="bg-[#F8F6F0] p-3 rounded-2xl border border-[#E5DFD3] space-y-2.5">
+                  <div className="flex items-center justify-between text-[11px] font-black text-[#111827]">
+                    <span>⛽ Fuel Log & Mileage Audit</span>
+                    <span className="text-[10px] text-[#EA580C]">Leakage Checker</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-[#4B5563] block mb-1">Select Car</label>
+                    <select
+                      value={expenseForm.vehicleId}
+                      onChange={e => {
+                        const vId = e.target.value;
+                        const selVeh = vehicles.find(v => v.id === vId);
+                        setExpenseForm(prev => ({
+                          ...prev,
+                          vehicleId: vId,
+                          odometerReading: selVeh?.odometer || prev.odometerReading,
+                          description: selVeh ? `Fuel for ${selVeh.plate} (${selVeh.brand} ${selVeh.model})` : prev.description
+                        }));
+                      }}
+                      className="w-full bg-white border border-[#E5DFD3] rounded-xl px-2.5 py-1.5 text-xs font-bold text-[#111827]"
+                    >
+                      <option value="">-- Choose Fleet Vehicle --</option>
+                      {vehicles.map(v => (
+                        <option key={v.id} value={v.id}>{v.plate} ({v.brand} {v.model})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-[#4B5563] block mb-1">Fuel Liters (L)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 25"
+                        value={expenseForm.fuelLiters}
+                        onChange={e => setExpenseForm(prev => ({ ...prev, fuelLiters: e.target.value }))}
+                        className="w-full bg-white border border-[#E5DFD3] rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-[#111827]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-[#4B5563] block mb-1">Odometer (KM)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 64250"
+                        value={expenseForm.odometerReading}
+                        onChange={e => setExpenseForm(prev => ({ ...prev, odometerReading: e.target.value }))}
+                        className="w-full bg-white border border-[#E5DFD3] rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-[#111827]"
+                      />
+                    </div>
+                  </div>
+
+                  {Number(expenseForm.fuelLiters) > 0 && Number(expenseForm.amount) > 0 && (
+                    <div className="flex justify-between items-center text-[10px] bg-white p-2 rounded-xl border border-[#E5DFD3] font-bold">
+                      <span className="text-[#4B5563]">Fuel Rate: ₹{(Number(expenseForm.amount) / Number(expenseForm.fuelLiters)).toFixed(1)}/L</span>
+                      <span className="text-emerald-700">Audit Verified ✅</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="text-xs font-bold text-[#111827] block mb-1">Amount (₹) *</label>

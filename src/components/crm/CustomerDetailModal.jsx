@@ -18,21 +18,43 @@ import {
   Receipt,
   UserCheck,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Edit3,
+  Trash2,
+  Save,
+  RotateCcw
 } from 'lucide-react';
 
 export const CustomerDetailModal = ({ customer, onClose }) => {
   const {
     bookings,
+    updateCustomer,
+    deleteCustomer,
     formatCurrency,
+    formatPhoneNumber,
     openNewBookingWithPrefill,
     setCustomerSettlementData,
     setSelectedTripDetailBooking,
     setSelectedInvoiceBooking,
-    setWhatsAppData
+    setWhatsAppData,
+    setSelectedCorporateCustomer
   } = useApp();
 
   const [tripFilter, setTripFilter] = useState('All'); // 'All' | 'Completed' | 'Ongoing' | 'Confirmed' | 'Cancelled'
+  const [isEditing, setIsEditing] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    name: customer?.name || '',
+    phone: customer?.phone || '',
+    whatsapp: customer?.whatsapp || customer?.phone || '',
+    type: customer?.type || 'Personal',
+    gstin: customer?.gstin || '',
+    contactPerson: customer?.contactPerson || '',
+    notes: customer?.notes || '',
+    address: customer?.address || ''
+  });
 
   if (!customer) return null;
 
@@ -81,6 +103,26 @@ export const CustomerDetailModal = ({ customer, onClose }) => {
     setSelectedInvoiceBooking(trip);
   };
 
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    if (!editForm.name.trim() || !editForm.phone.trim()) {
+      alert("Customer name and phone number are required.");
+      return;
+    }
+
+    updateCustomer(customer.id, editForm);
+    setIsEditing(false);
+    setSaveSuccessMsg('🎉 Customer profile updated successfully!');
+    setTimeout(() => setSaveSuccessMsg(''), 3500);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Are you sure you want to delete customer "${customer.name}"? This action cannot be undone.`)) {
+      deleteCustomer(customer.id);
+      onClose();
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
       <div className="bg-[#F8F6F0] w-full max-w-xl rounded-t-3xl sm:rounded-4xl max-h-[92vh] flex flex-col shadow-2xl border-2 border-[#E5DFD3] overflow-hidden">
@@ -102,171 +144,366 @@ export const CustomerDetailModal = ({ customer, onClose }) => {
                 </span>
               </div>
               <p className="text-xs text-[#4B5563] font-semibold mt-0.5">
-                📞 +91 {customer.phone}
+                📞 {formatPhoneNumber(customer.phone)}
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                setEditForm({
+                  name: customer.name || '',
+                  phone: customer.phone || '',
+                  whatsapp: customer.whatsapp || customer.phone || '',
+                  type: customer.type || 'Personal',
+                  gstin: customer.gstin || '',
+                  contactPerson: customer.contactPerson || '',
+                  notes: customer.notes || '',
+                  address: customer.address || ''
+                });
+                setIsEditing(!isEditing);
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 transition tap-active shadow-xs ${
+                isEditing
+                  ? 'bg-amber-100 text-amber-950 border border-amber-300'
+                  : 'bg-gray-100 text-[#111827] hover:bg-gray-200 border border-[#E5DFD3]'
+              }`}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>{isEditing ? 'Cancel Edit' : 'Edit Profile'}</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-          {/* Quick Metrics Grid */}
-          <div className="grid grid-cols-3 gap-2.5">
-            <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
-              <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
-                Total Bookings
-              </span>
-              <span className="text-lg font-black text-[#111827] mt-0.5 block">
-                {customerTrips.length}
-              </span>
-              <span className="text-[10px] text-emerald-700 font-bold">
-                {completedTripsCount} Completed
-              </span>
+          {saveSuccessMsg && (
+            <div className="p-3 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-emerald-950 text-xs font-black flex items-center space-x-2 animate-fade-in shadow-xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{saveSuccessMsg}</span>
             </div>
+          )}
 
-            <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
-              <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
-                Lifetime Spend
-              </span>
-              <span className="text-lg font-black text-[#111827] mt-0.5 block">
-                {formatCurrency(totalBilled)}
-              </span>
-              <span className="text-[10px] text-blue-700 font-bold">
-                Gross Billed
-              </span>
-            </div>
-
-            <div className={`rounded-2xl p-3 border-2 shadow-xs ${
-              customer.pendingBalance > 0
-                ? 'bg-rose-50 border-rose-300 text-rose-950'
-                : 'bg-emerald-50 border-emerald-300 text-emerald-950'
-            }`}>
-              <span className="text-[10px] font-bold uppercase tracking-wider block">
-                Pending Balance
-              </span>
-              <span className={`text-lg font-black mt-0.5 block ${
-                customer.pendingBalance > 0 ? 'text-rose-700' : 'text-emerald-700'
-              }`}>
-                {formatCurrency(customer.pendingBalance || 0)}
-              </span>
-              <span className="text-[10px] font-bold">
-                {customer.pendingBalance > 0 ? '⚠️ Due Pending' : '✓ All Cleared'}
-              </span>
-            </div>
-          </div>
-
-          {/* Customer Address & Business Notes */}
-          <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] space-y-2.5 shadow-xs">
-            <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-[#EA580C]" />
-              <span>Contact & Billing Information</span>
-            </h4>
-
-            <div className="space-y-1.5 text-xs text-[#374151]">
-              {customer.address ? (
-                <div className="flex items-start gap-2 bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3]">
-                  <span className="font-bold text-gray-500 shrink-0">Address:</span>
-                  <span className="font-semibold">{customer.address}</span>
+          {/* ===================================================== */}
+          {/* EDIT FORM MODE */}
+          {/* ===================================================== */}
+          {isEditing ? (
+            <form onSubmit={handleSaveEdit} className="bg-white rounded-3xl p-5 border-2 border-amber-300 shadow-soft space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                <div className="flex items-center space-x-2">
+                  <Edit3 className="w-4 h-4 text-amber-600" />
+                  <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">
+                    Edit Customer Details
+                  </h4>
                 </div>
-              ) : (
-                <p className="text-[11px] text-gray-500 italic">No address registered.</p>
-              )}
-
-              {customer.gstin && (
-                <div className="flex items-center justify-between bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3]">
-                  <span className="font-bold text-gray-500">GSTIN No:</span>
-                  <span className="font-mono font-black text-[#111827]">{customer.gstin}</span>
-                </div>
-              )}
-
-              {customer.notes && (
-                <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-amber-950 text-[11px]">
-                  <span className="font-bold block">Operator Notes:</span>
-                  <span>{customer.notes}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Actions Row */}
-            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
-              <a
-                href={`tel:${customer.phone}`}
-                className="py-2 rounded-xl bg-white border border-[#E5DFD3] text-[#111827] text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-gray-50 tap-active shadow-xs"
-              >
-                <Phone className="w-3.5 h-3.5 text-blue-600" />
-                <span>Call Party</span>
-              </a>
-
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  setWhatsAppData({
-                    type: 'booking',
-                    booking: {
-                      customerName: customer.name,
-                      customerPhone: customer.phone,
-                      pickupLocation: customer.address || 'Pune Hub',
-                      id: 'ENQUIRY'
-                    }
-                  });
-                }}
-                className="py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-100 tap-active shadow-xs"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                <span>WhatsApp</span>
-              </button>
-
-              {customer.pendingBalance > 0 ? (
                 <button
                   type="button"
-                  onClick={handleSettleDue}
-                  className="py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black flex items-center justify-center gap-1 shadow-xs tap-active"
+                  onClick={handleDelete}
+                  className="text-xs font-black text-red-600 hover:text-red-700 flex items-center gap-1 tap-active"
                 >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  <span>Settle Due</span>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Party</span>
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleBookNewTrip}
-                  className="py-2 rounded-xl bg-[#111827] hover:bg-black text-white text-xs font-black flex items-center justify-center gap-1 shadow-xs tap-active"
-                >
-                  <Calendar className="w-3.5 h-3.5 text-[#D4F05B]" />
-                  <span>Book Trip</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Customer Trips History Section */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider flex items-center gap-1.5">
-                  <Navigation className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Trip History & Duty Logs ({customerTrips.length})</span>
-                </h4>
-                <p className="text-[10px] text-[#4B5563] font-semibold">
-                  Tap any trip to open detailed timeline, maps & tax invoice
-                </p>
               </div>
 
-              {/* Trip Filter Pills */}
-              <div className="flex space-x-1 bg-white p-1 rounded-full border border-[#E5DFD3]">
-                {['All', 'Completed', 'Ongoing'].map(f => (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-black text-[#111827] block mb-1">
+                    Customer / Party Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.phone}
+                      onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      WhatsApp Number
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.whatsapp}
+                      onChange={e => setEditForm(prev => ({ ...prev, whatsapp: e.target.value }))}
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      Customer Type
+                    </label>
+                    <select
+                      value={editForm.type}
+                      onChange={e => setEditForm(prev => ({ ...prev, type: e.target.value }))}
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    >
+                      <option value="Personal">Personal Party</option>
+                      <option value="Corporate">Corporate / B2B</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      GSTIN (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.gstin}
+                      onChange={e => setEditForm(prev => ({ ...prev, gstin: e.target.value.toUpperCase() }))}
+                      placeholder="e.g. 27AAACT2941E1Z3"
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-mono font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    />
+                  </div>
+                </div>
+
+                {editForm.type === 'Corporate' && (
+                  <div>
+                    <label className="text-xs font-black text-[#111827] block mb-1">
+                      Contact Person & Designation
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.contactPerson}
+                      onChange={e => setEditForm(prev => ({ ...prev, contactPerson: e.target.value }))}
+                      placeholder="e.g. Priya Sharma (HR Manager)"
+                      className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-black text-[#111827] block mb-1">
+                    Pickup Address / Headquarters
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.address}
+                    onChange={e => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                    placeholder="e.g. Kothrud, Pune"
+                    className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-black text-[#111827] block mb-1">
+                    Customer Preferences & Notes
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editForm.notes}
+                    onChange={e => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="e.g. Always requests Innova Crysta, pays within 7 days."
+                    className="w-full bg-[#F8F6F0] border-2 border-[#E5DFD3] rounded-2xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="flex-1 py-2.5 rounded-full bg-gray-100 text-[#4B5563] text-xs font-black hover:bg-gray-200 tap-active"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-2 py-2.5 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black shadow-md flex items-center justify-center gap-1.5 tap-active"
+                >
+                  <Save className="w-3.5 h-3.5 text-[#D4F05B]" />
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
+          ) : (
+            /* ===================================================== */
+            /* VIEW MODE */
+            /* ===================================================== */
+            <>
+              {/* Quick Metrics Grid */}
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
+                  <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
+                    Total Bookings
+                  </span>
+                  <span className="text-lg font-black text-[#111827] mt-0.5 block">
+                    {customerTrips.length}
+                  </span>
+                  <span className="text-[10px] text-emerald-700 font-bold">
+                    {completedTripsCount} Completed
+                  </span>
+                </div>
+
+                <div className="bg-white rounded-2xl p-3 border-2 border-[#E5DFD3] shadow-xs">
+                  <span className="text-[10px] font-bold text-[#4B5563] uppercase tracking-wider block">
+                    Lifetime Spend
+                  </span>
+                  <span className="text-lg font-black text-[#111827] mt-0.5 block">
+                    {formatCurrency(totalBilled)}
+                  </span>
+                  <span className="text-[10px] text-blue-700 font-bold">
+                    Gross Billed
+                  </span>
+                </div>
+
+                <div className={`rounded-2xl p-3 border-2 shadow-xs ${
+                  customer.pendingBalance > 0
+                    ? 'bg-rose-50 border-rose-300 text-rose-950'
+                    : 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                }`}>
+                  <span className="text-[10px] font-bold uppercase tracking-wider block">
+                    Pending Balance
+                  </span>
+                  <span className={`text-lg font-black mt-0.5 block ${
+                    customer.pendingBalance > 0 ? 'text-rose-700' : 'text-emerald-700'
+                  }`}>
+                    {formatCurrency(customer.pendingBalance || 0)}
+                  </span>
+                  <span className="text-[10px] font-bold">
+                    {customer.pendingBalance > 0 ? '⚠️ Due Pending' : '✓ All Cleared'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Customer Address & Business Notes */}
+              <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] space-y-2.5 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#EA580C]" />
+                    <span>Contact & Billing Information</span>
+                  </h4>
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-0.5"
+                  >
+                    <span>Edit</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <div className="space-y-1.5 text-xs text-[#374151]">
+                  {customer.address ? (
+                    <div className="flex items-start gap-2 bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3]">
+                      <span className="font-bold text-gray-500 shrink-0">Address:</span>
+                      <span className="font-semibold">{customer.address}</span>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-500 italic">No address registered.</p>
+                  )}
+
+                  {customer.gstin && (
+                    <div className="flex items-center gap-2 bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3] font-mono">
+                      <span className="font-bold text-gray-500 font-sans">GSTIN:</span>
+                      <span className="font-bold text-[#111827]">{customer.gstin}</span>
+                    </div>
+                  )}
+
+                  {customer.contactPerson && (
+                    <div className="flex items-center gap-2 bg-[#F8F6F0] p-2.5 rounded-xl border border-[#E5DFD3]">
+                      <span className="font-bold text-gray-500">Contact Person:</span>
+                      <span className="font-bold text-[#111827]">{customer.contactPerson}</span>
+                    </div>
+                  )}
+
+                  {customer.notes && (
+                    <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-amber-950 font-semibold text-[11px]">
+                      <b>Note:</b> {customer.notes}
+                    </div>
+                  )}
+
+                  {/* Direct Action Links */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
+                    <a
+                      href={`tel:${customer.phone}`}
+                      className="py-2 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-[#111827] text-xs font-black flex items-center justify-center gap-1.5 tap-active"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Call Customer</span>
+                    </a>
+
+                    <button
+                      onClick={() => setWhatsAppData({
+                        type: customer.pendingBalance > 0 ? 'reminder' : 'booking',
+                        customer: customer,
+                        targetName: customer.name,
+                        targetPhone: customer.phone,
+                        booking: { customerName: customer.name, customerPhone: customer.phone, pickupLocation: customer.address, id: 'ENQUIRY' }
+                      })}
+                      className="py-2 px-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-emerald-950 text-xs font-black flex items-center justify-center gap-1.5 tap-active"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 text-[#25D366]" />
+                      <span>{customer.pendingBalance > 0 ? 'Dues WhatsApp' : 'WhatsApp'}</span>
+                    </button>
+                  </div>
+
+                  {/* Corporate Monthly Consolidated Invoicing Trigger */}
+                  {customer.type === 'Corporate' && (
+                    <div className="pt-2 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          setSelectedCorporateCustomer(customer);
+                        }}
+                        className="w-full py-2.5 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-950 text-xs font-black flex items-center justify-center gap-2 tap-active shadow-xs"
+                      >
+                        <FileText className="w-4 h-4 text-purple-700" />
+                        <span>Generate B2B Monthly Consolidated Bill</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ===================================================== */}
+          {/* CUSTOMER BOOKING HISTORY */}
+          {/* ===================================================== */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">
+                Trip History ({customerTrips.length})
+              </h4>
+
+              {/* Filter Tabs */}
+              <div className="flex bg-white p-1 rounded-full border-2 border-[#E5DFD3] text-[10px] font-black shadow-xs">
+                {['All', 'Ongoing', 'Completed'].map(f => (
                   <button
                     key={f}
                     onClick={() => setTripFilter(f)}
-                    className={`px-2 py-0.5 text-[10px] font-black rounded-full transition-all ${
-                      tripFilter === f ? 'bg-[#111827] text-white shadow-xs' : 'text-gray-600 hover:text-black'
+                    className={`px-2.5 py-0.5 rounded-full transition-all ${
+                      tripFilter === f
+                        ? 'bg-[#111827] text-white shadow-xs'
+                        : 'text-[#4B5563] hover:text-[#111827]'
                     }`}
                   >
                     {f}
@@ -275,27 +512,19 @@ export const CustomerDetailModal = ({ customer, onClose }) => {
               </div>
             </div>
 
-            {/* Trips List */}
             {filteredTrips.length === 0 ? (
               <div className="bg-white rounded-3xl p-6 border-2 border-[#E5DFD3] text-center space-y-2 shadow-xs">
-                <Car className="w-8 h-8 text-gray-400 mx-auto" />
-                <h5 className="text-xs font-black text-[#111827]">No trips found</h5>
-                <p className="text-[11px] text-gray-500 font-semibold">
-                  No {tripFilter !== 'All' ? tripFilter.toLowerCase() : ''} bookings registered for this customer yet.
+                <Calendar className="w-8 h-8 text-gray-400 mx-auto" />
+                <h5 className="text-xs font-black text-[#111827]">No Trips Found</h5>
+                <p className="text-[11px] text-[#4B5563] font-semibold">
+                  This party does not have any trips matching the "{tripFilter}" filter.
                 </p>
-                <button
-                  onClick={handleBookNewTrip}
-                  className="mt-2 px-4 py-1.5 rounded-full bg-[#111827] text-white text-xs font-black inline-flex items-center gap-1"
-                >
-                  <Calendar className="w-3 h-3 text-[#D4F05B]" />
-                  <span>Create First Booking</span>
-                </button>
               </div>
             ) : (
               <div className="space-y-2.5">
                 {filteredTrips.map(trip => {
                   const isCompleted = trip.status === 'Completed';
-                  const isOngoing = trip.status === 'Ongoing' || trip.status === 'Driver Assigned';
+                  const isOngoing = trip.status === 'Ongoing' || trip.status === 'Driver Assigned' || trip.status === 'Confirmed';
                   const isCancelled = trip.status === 'Cancelled';
 
                   return (
@@ -392,13 +621,25 @@ export const CustomerDetailModal = ({ customer, onClose }) => {
             Close
           </button>
 
-          <button
-            onClick={handleBookNewTrip}
-            className="px-5 py-2.5 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black flex items-center gap-1.5 shadow-md tap-active"
-          >
-            <Calendar className="w-3.5 h-3.5 text-[#D4F05B]" />
-            <span>Book New Trip For Customer</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            {customer.pendingBalance > 0 && (
+              <button
+                onClick={handleSettleDue}
+                className="px-4 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1 shadow-sm tap-active"
+              >
+                <CreditCard className="w-3.5 h-3.5" />
+                <span>Settle ₹{customer.pendingBalance} Due</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleBookNewTrip}
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black flex items-center gap-1.5 shadow-md tap-active"
+            >
+              <Calendar className="w-3.5 h-3.5 text-[#D4F05B]" />
+              <span>Book Trip</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

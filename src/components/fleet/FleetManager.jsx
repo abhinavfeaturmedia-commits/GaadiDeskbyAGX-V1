@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   X,
   Clock,
-  Filter
+  Filter,
+  Wrench
 } from 'lucide-react';
 
 export const FleetManager = () => {
@@ -24,7 +25,8 @@ export const FleetManager = () => {
     updateVehicleOdometer,
     checkVehicleClash,
     isNewVehicleOpen,
-    setIsNewVehicleOpen
+    setIsNewVehicleOpen,
+    setServiceModalVehicle
   } = useApp();
 
   const [filterCategory, setFilterCategory] = useState('All');
@@ -239,7 +241,7 @@ export const FleetManager = () => {
                 </div>
               </div>
 
-              {/* Document Compliance Pills */}
+              {/* Document & Service Compliance Pills */}
               <div className="bg-[#FBF8F2] rounded-2xl p-2.5 border border-card-border space-y-1 text-[11px]">
                 <div className="flex items-center justify-between font-semibold text-gray-800">
                   <span className="text-text-secondary">Insurance Expiry:</span>
@@ -249,19 +251,40 @@ export const FleetManager = () => {
                   <span className="text-text-secondary">PUC Expiry:</span>
                   <span className="font-bold">{veh.documents?.pucExpiry}</span>
                 </div>
+                <div className="flex items-center justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200">
+                  <span className="text-text-secondary flex items-center gap-1">
+                    <Wrench className="w-3 h-3 text-[#EA580C]" />
+                    <span>Next Service Due:</span>
+                  </span>
+                  <span className={`font-black text-[10px] px-2 py-0.5 rounded-full ${
+                    ((veh.nextServiceDueOdometer || 70000) - (veh.odometer || 0)) <= 1000
+                      ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                      : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                  }`}>
+                    {((veh.nextServiceDueOdometer || (veh.lastServiceOdometer ? veh.lastServiceOdometer + 10000 : (veh.odometer + 4000))) - (veh.odometer || 0)).toLocaleString()} KM left
+                  </span>
+                </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-1 grid grid-cols-2 gap-2">
+              <div className="pt-1 grid grid-cols-3 gap-1.5">
                 <button
                   onClick={() => {
                     setSelectedVehicleForCheck(veh);
                     setClashResult(null);
                   }}
-                  className="w-full py-2 rounded-full bg-white border border-card-border text-gray-800 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-gray-50 tap-active shadow-xs"
+                  className="py-2 rounded-2xl bg-white border border-[#E5DFD3] text-gray-800 text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-gray-50 tap-active shadow-xs"
                 >
-                  <Calendar className="w-3.5 h-3.5 text-accent-amber" />
+                  <Calendar className="w-3 h-3 text-amber-600" />
                   <span>{t('btnCheckFree')}</span>
+                </button>
+
+                <button
+                  onClick={() => setServiceModalVehicle(veh)}
+                  className="py-2 rounded-2xl bg-white border border-[#E5DFD3] text-[#111827] text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-gray-50 tap-active shadow-xs"
+                >
+                  <Wrench className="w-3 h-3 text-blue-600" />
+                  <span>Service</span>
                 </button>
 
                 <button
@@ -269,9 +292,9 @@ export const FleetManager = () => {
                     setSelectedVehicleForOdo(veh);
                     setOdoInput(veh.odometer || 0);
                   }}
-                  className="w-full py-2 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-amber-100 tap-active shadow-xs"
+                  className="py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] font-black flex items-center justify-center gap-1 hover:bg-amber-100 tap-active shadow-xs"
                 >
-                  <Gauge className="w-3.5 h-3.5 text-amber-700" />
+                  <Gauge className="w-3 h-3 text-amber-700" />
                   <span>Set KM</span>
                 </button>
               </div>

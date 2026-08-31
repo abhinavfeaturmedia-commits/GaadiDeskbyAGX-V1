@@ -74,6 +74,11 @@ export const AppProvider = ({ children }) => {
   const [moneySubTab, setMoneySubTab] = useState('daily'); // 'daily' | 'analytics'
   const [analyticsPeriod, setAnalyticsPeriod] = useState('30d'); // '7d' | '30d' | '90d' | '6m' | '1y' | 'all'
 
+  // Driver Active Screen / Tab Navigation
+  const [driverActiveTab, setDriverActiveTab] = useState('duty'); // 'duty' | 'trips' | 'wallet' | 'profile'
+  const [driverTollModalBooking, setDriverTollModalBooking] = useState(null);
+  const [driverUpiModalData, setDriverUpiModalData] = useState(null); // { booking, amount }
+
   // Modals & Drawers
   const [isNewBookingOpen, setIsNewBookingOpen] = useState(false);
   const [newBookingPrefill, setNewBookingPrefill] = useState(null); // { customerName, customerPhone, tripType, vehicleId }
@@ -88,6 +93,28 @@ export const AppProvider = ({ children }) => {
   const [whatsAppData, setWhatsAppData] = useState(null); // { type: 'booking' | 'duty' | 'invoice' | 'reminder', booking: {}, driver: {}, customer: {} }
   const [renewalModalData, setRenewalModalData] = useState(null); // { vehicleId, docType, plate, model, currentExpiry }
   const [customerSettlementData, setCustomerSettlementData] = useState(null); // { customerId, name, phone, pendingBalance }
+
+  // New Feature Suite Modal States
+  const [isQuickQuoteOpen, setIsQuickQuoteOpen] = useState(false);
+  const [selectedCorporateCustomer, setSelectedCorporateCustomer] = useState(null);
+  const [isCaExportOpen, setIsCaExportOpen] = useState(false);
+  const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(false);
+  const [serviceModalVehicle, setServiceModalVehicle] = useState(null);
+  const [inspectionModalBooking, setInspectionModalBooking] = useState(null);
+
+  // Notification Read / Dismissed tracking
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gd_read_notifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gd_read_notifications', JSON.stringify(readNotificationIds));
+  }, [readNotificationIds]);
 
   // Sync authUser to localStorage
   useEffect(() => {
@@ -252,6 +279,240 @@ export const AppProvider = ({ children }) => {
     });
 
     return alerts.sort((a, b) => a.daysLeft - b.daysLeft);
+  };
+
+  // Notification Mark-Read & Clear Handlers
+  const markNotificationAsRead = (id) => {
+    if (!id) return;
+    setReadNotificationIds(prev => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
+  const markAllNotificationsAsRead = (notifsList = []) => {
+    const ids = notifsList.map(n => n.id);
+    setReadNotificationIds(prev => Array.from(new Set([...prev, ...ids])));
+  };
+
+  const clearAllNotifications = (notifsList = []) => {
+    const ids = notifsList.map(n => n.id);
+    setReadNotificationIds(prev => Array.from(new Set([...prev, ...ids])));
+  };
+
+  // Unified Role-Based Smart Notification Engine
+  const getSmartNotifications = (customRole) => {
+    const role = (customRole || (authUser?.role === 'driver' ? 'driver' : (authUser?.role?.toLowerCase() || 'owner'))).toLowerCase();
+    const notifs = [];
+    const today = new Date();
+
+    // 1. DRIVER NOTIFICATIONS
+    if (role === 'driver') {
+      const driverId = authUser?.driverId || 'drv-01';
+      const currentDriver = drivers.find(d => d.id === driverId) || drivers[0];
+
+      // Driver Assigned Duties
+      const assignedBookings = bookings.filter(b => b.driverId === driverId && (b.status === 'Confirmed' || b.status === 'Ongoing' || b.status === 'Driver Assigned'));
+      assignedBookings.forEach(b => {
+        const isOngoing = b.status === 'Ongoing';
+        notifs.push({
+          id: `drv-duty-${b.id}`,
+          category: 'trips',
+          targetRole: 'driver',
+          severity: isOngoing ? 'urgent' : 'info',
+          title: isOngoing ? `Ongoing Duty: #${b.bookingNumber || b.id}` : `New Duty Assigned: #${b.bookingNumber || b.id}`,
+          subtitle: `${b.pickupLocation || 'Pickup'} ➔ ${b.dropLocation || 'Drop'} • ${b.pickupDate || b.startDateTime || 'Today'} (${b.customerName || 'Passenger'})`,
+          timestamp: isOngoing ? 'In Progress' : 'New Assignment',
+          actionType: 'VIEW_DRIVER_DUTY',
+          actionPayload: b,
+          actionLabel: isOngoing ? 'Trip Status' : 'View Duty Slip'
+        });
+      });
+
+      // Pending Cash Collection from completed or ongoing trips
+      const tripsToCollect = bookings.filter(b => b.driverId === driverId && (Number(b.balanceAmount || 0) > 0 || (Number(b.totalAmount || 0) > 0 && !b.advanceReceived)));
+      tripsToCollect.slice(0, 3).forEach(b => {
+        const amount = Number(b.balanceAmount || b.totalAmount || 1500);
+        notifs.push({
+          id: `drv-cash-${b.id}`,
+          category: 'money',
+          targetRole: 'driver',
+          severity: 'urgent',
+          title: `Collect Passenger Fare: ₹${amount.toLocaleString('en-IN')}`,
+          subtitle: `Trip #${b.bookingNumber || b.id} • ${b.customerName || 'Passenger'} (${b.dropLocation || 'Drop'})`,
+          timestamp: 'Cash in Hand',
+          actionType: 'COLLECT_CASH',
+          actionPayload: { booking: b, amount },
+          actionLabel: 'Show UPI QR / Collect'
+        });
+      });
+
+      // Driver DL Expiry Check
+      if (currentDriver?.dlExpiry) {
+        const expDate = new Date(currentDriver.dlExpiry);
+        const diffDays = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 45) {
+          notifs.push({
+            id: `drv-dl-${currentDriver.id}`,
+            category: 'compliance',
+            targetRole: 'driver',
+            severity: diffDays <= 7 ? 'critical' : diffDays <= 15 ? 'urgent' : 'warning',
+            title: `Driving License (DL) ${diffDays <= 0 ? 'Expired' : 'Expiring Soon'}`,
+            subtitle: `Valid till ${currentDriver.dlExpiry} (${diffDays <= 0 ? '⚠️ Overdue' : `⏳ ${diffDays} days left`}) • Submit renewed copy to office`,
+            timestamp: 'DL Compliance',
+            actionType: 'RENEW_DOC',
+            actionPayload: {
+              driverId: currentDriver.id,
+              driverName: currentDriver.name,
+              docType: 'Driver License (DL)',
+              expiryDate: currentDriver.dlExpiry,
+              isExpired: diffDays <= 0,
+              isUrgent: diffDays <= 15
+            },
+            actionLabel: 'Update License'
+          });
+        }
+      }
+
+      return notifs.map(n => ({
+        ...n,
+        isRead: readNotificationIds.includes(n.id)
+      }));
+    }
+
+    // 2. FLEET OWNER, DISPATCHER, ACCOUNTANT, MANAGER NOTIFICATIONS
+
+    // A. Compliance / RTO Alerts (PUC, Insurance, Fitness, Permit, DL)
+    const docAlerts = getDocumentAlerts();
+    docAlerts.forEach(alt => {
+      notifs.push({
+        id: `rto-${alt.vehicleId || alt.driverId}-${alt.docType}`,
+        category: 'compliance',
+        targetRole: 'all',
+        severity: alt.isExpired ? 'critical' : alt.isUrgent ? 'urgent' : 'warning',
+        title: `${alt.vehiclePlate || alt.driverName} • ${alt.docType} ${alt.isExpired ? 'Expired' : 'Expiring Soon'}`,
+        subtitle: `Expires on ${alt.expiryDate} (${alt.isExpired ? '⚠️ Overdue' : `⏳ ${alt.daysLeft} days left`}) • Challan Risk: ₹10,000`,
+        timestamp: 'RTO Radar',
+        actionType: 'RENEW_DOC',
+        actionPayload: alt,
+        actionLabel: 'Renew Now'
+      });
+    });
+
+    // B. Periodic Service / Maintenance Alerts
+    const srvAlerts = getServiceAlerts ? getServiceAlerts() : [];
+    srvAlerts.forEach(sa => {
+      const veh = vehicles.find(v => v.id === sa.vehicleId);
+      if (!veh) return;
+      notifs.push({
+        id: `srv-${sa.vehicleId}`,
+        category: 'compliance',
+        targetRole: 'all',
+        severity: sa.isOverdue ? 'critical' : sa.isUrgent ? 'urgent' : 'warning',
+        title: `${sa.vehiclePlate} • Periodic Service Due`,
+        subtitle: `${sa.isOverdue ? `Overdue by ${Math.abs(sa.kmRemaining)} km` : `${sa.kmRemaining} km remaining`} • ${sa.serviceType}`,
+        timestamp: 'Maintenance',
+        actionType: 'SERVICE_VEHICLE',
+        actionPayload: veh,
+        actionLabel: 'Book Service'
+      });
+    });
+
+    // C. Trips & Dispatch Alerts (Unassigned Trips & Delayed Trips)
+    bookings.forEach(b => {
+      if (b.status === 'Confirmed' || b.status === 'Draft' || b.status === 'Unassigned') {
+        const isUnassigned = !b.driverId || !b.vehicleId;
+        if (isUnassigned) {
+          notifs.push({
+            id: `trip-unassigned-${b.id}`,
+            category: 'trips',
+            targetRole: 'dispatcher',
+            severity: 'urgent',
+            title: `Unassigned Trip #${b.bookingNumber || b.id}`,
+            subtitle: `${b.pickupLocation || 'Pickup'} ➔ ${b.dropLocation || 'Drop'} • ${b.pickupDate || b.startDateTime || 'Upcoming'} (${b.customerName || 'Customer'})`,
+            timestamp: 'Needs Dispatch',
+            actionType: 'ASSIGN_DRIVER',
+            actionPayload: b,
+            actionLabel: 'Assign Driver & Car'
+          });
+        }
+      }
+
+      // Check if trip start time passed and still confirmed (Late departure)
+      if (b.status === 'Confirmed' && b.startDateTime) {
+        const startTime = new Date(b.startDateTime).getTime();
+        if (startTime < today.getTime() && (today.getTime() - startTime < 86400000)) {
+          notifs.push({
+            id: `trip-delayed-${b.id}`,
+            category: 'trips',
+            targetRole: 'dispatcher',
+            severity: 'warning',
+            title: `Departure Pending: #${b.bookingNumber || b.id}`,
+            subtitle: `Scheduled for ${b.startDateTime.slice(11, 16) || 'earlier'} • Driver has not started trip yet`,
+            timestamp: 'Delay Radar',
+            actionType: 'VIEW_TRIP',
+            actionPayload: b,
+            actionLabel: 'Check Trip'
+          });
+        }
+      }
+    });
+
+    // D. Money & Billing Alerts
+    // High customer pending balance
+    customers.forEach(c => {
+      if (c.pendingBalance && c.pendingBalance >= 5000) {
+        notifs.push({
+          id: `money-cust-${c.id}`,
+          category: 'money',
+          targetRole: 'accountant',
+          severity: c.pendingBalance >= 15000 ? 'urgent' : 'warning',
+          title: `Pending Recovery: ₹${c.pendingBalance.toLocaleString('en-IN')} (${c.name})`,
+          subtitle: `${c.company || 'Corporate Client'} • Balance pending across completed rides`,
+          timestamp: 'Accounts Due',
+          actionType: 'SETTLE_CUSTOMER',
+          actionPayload: c,
+          actionLabel: 'Send WA Due Link'
+        });
+      }
+    });
+
+    // Completed trips needing Tax Invoice
+    const completedTrips = bookings.filter(b => b.status === 'Completed');
+    completedTrips.slice(0, 3).forEach(b => {
+      notifs.push({
+        id: `money-inv-${b.id}`,
+        category: 'money',
+        targetRole: 'accountant',
+        severity: 'info',
+        title: `GST Invoice Ready: #${b.bookingNumber || b.id}`,
+        subtitle: `${b.customerName} • Net Fare ₹${(b.totalAmount || b.netFare || 0).toLocaleString('en-IN')} • 1-click tax bill`,
+        timestamp: 'Billing',
+        actionType: 'GENERATE_INVOICE',
+        actionPayload: b,
+        actionLabel: 'Generate GST Bill'
+      });
+    });
+
+    // Filter by role if dispatcher or accountant
+    let filteredNotifs = notifs;
+    if (role === 'dispatcher') {
+      filteredNotifs = notifs.filter(n => n.category === 'trips' || n.category === 'compliance' || n.severity === 'critical' || n.severity === 'urgent');
+    } else if (role === 'accountant') {
+      filteredNotifs = notifs.filter(n => n.category === 'money' || n.severity === 'critical' || n.category === 'trips');
+    }
+
+    return filteredNotifs.map(n => ({
+      ...n,
+      isRead: readNotificationIds.includes(n.id)
+    }));
+  };
+
+  const getUnreadNotificationCount = (customRole) => {
+    const allNotifs = getSmartNotifications(customRole);
+    const unread = allNotifs.filter(n => !n.isRead);
+    const urgent = unread.filter(n => (n.severity === 'critical' || n.severity === 'urgent') && !n.isRead);
+    return {
+      total: unread.length,
+      urgent: urgent.length
+    };
   };
 
   // Record a transaction in central ledger
@@ -610,6 +871,173 @@ export const AppProvider = ({ children }) => {
       };
     }));
     setRenewalModalData(null);
+  };
+
+  // Vehicle Service & Maintenance Scheduler
+  const updateVehicleServiceSchedule = (vehicleId, serviceData) => {
+    setVehicles(prev => prev.map(v => {
+      if (v.id !== vehicleId) return v;
+      return {
+        ...v,
+        lastServiceOdometer: serviceData.lastServiceOdometer || v.odometer,
+        nextServiceDueOdometer: serviceData.nextServiceDueOdometer || (v.odometer + 10000),
+        lastServiceDate: serviceData.lastServiceDate || new Date().toISOString().split('T')[0],
+        lastServiceType: serviceData.lastServiceType || 'General Service',
+        lastServiceCost: serviceData.lastServiceCost || 0,
+        lastWorkshop: serviceData.lastWorkshop || ''
+      };
+    }));
+  };
+
+  // Periodic Service Alerts Checker
+  const getServiceAlerts = () => {
+    const alerts = [];
+    vehicles.forEach(veh => {
+      const currentOdo = Number(veh.odometer || 0);
+      const nextDue = Number(veh.nextServiceDueOdometer || (veh.lastServiceOdometer ? veh.lastServiceOdometer + 10000 : 70000));
+      const kmRemaining = nextDue - currentOdo;
+
+      if (kmRemaining <= 1500) {
+        alerts.push({
+          vehicleId: veh.id,
+          vehiclePlate: veh.plate,
+          vehicleModel: `${veh.brand} ${veh.model}`,
+          currentOdometer: currentOdo,
+          nextDueOdometer: nextDue,
+          kmRemaining,
+          isOverdue: kmRemaining <= 0,
+          isUrgent: kmRemaining <= 500,
+          serviceType: veh.lastServiceType || 'Engine Oil & 10K Service'
+        });
+      }
+    });
+    return alerts.sort((a, b) => a.kmRemaining - b.kmRemaining);
+  };
+
+  // 6-Point Vehicle Handover Inspection Saver
+  const saveVehicleInspection = (bookingId, inspectionData) => {
+    setBookings(prev => prev.map(b => {
+      if (b.id !== bookingId) return b;
+      return {
+        ...b,
+        inspectionData
+      };
+    }));
+  };
+
+  // Digital Signature Saver (Customer / Driver)
+  const saveDigitalSignature = (bookingId, signatureDataUrl, type = 'customer') => {
+    setBookings(prev => prev.map(b => {
+      if (b.id !== bookingId) return b;
+      return {
+        ...b,
+        customerSignature: type === 'customer' ? signatureDataUrl : b.customerSignature,
+        driverSignature: type === 'driver' ? signatureDataUrl : b.driverSignature,
+        signedAt: new Date().toISOString()
+      };
+    }));
+  };
+
+  // WhatsApp Booking Text Heuristic / Regex Parser
+  const parseWhatsAppBookingText = (text) => {
+    if (!text) return null;
+    const result = {
+      customerName: '',
+      customerPhone: '',
+      pickupLocation: '',
+      dropLocation: '',
+      tripType: 'Outstation',
+      category: 'Sedan',
+      startDateTime: '',
+      endDateTime: '',
+      estimatedKm: 300,
+      baseFare: 0,
+      notes: ''
+    };
+
+    const raw = text.trim();
+
+    // 1. Phone number match
+    const phoneMatch = raw.match(/(?:\+91[\s-]?)?([6-9]\d{9})/);
+    if (phoneMatch) {
+      result.customerPhone = phoneMatch[1];
+    }
+
+    // 2. Customer name match
+    const nameMatch = raw.match(/(?:guest|client|customer|mr\.?|mrs\.?|name)\s*[:\-]?\s*([a-zA-Z\s]{3,25})/i);
+    if (nameMatch) {
+      result.customerName = nameMatch[1].trim();
+    }
+
+    // 3. Route match (e.g. Pune to Shirdi, Mumbai -> Goa)
+    const routeMatch = raw.match(/([a-zA-Z\s]{3,20}?)\s*(?:to|->|➔|--)\s*([a-zA-Z\s]{3,20}?)(?:[,\n\.]|\d|\s+(?:innova|ertiga|crysta|sedan|car|cab|on|date|rate|fare))/i);
+    if (routeMatch) {
+      result.pickupLocation = routeMatch[1].trim();
+      result.dropLocation = routeMatch[2].trim();
+    } else {
+      const pickupMatch = raw.match(/pickup\s*[:\-]?\s*([a-zA-Z0-9\s]+?)(?:[,\n]|drop)/i);
+      const dropMatch = raw.match(/drop\s*[:\-]?\s*([a-zA-Z0-9\s]+?)(?:[,\n]|$)/i);
+      if (pickupMatch) result.pickupLocation = pickupMatch[1].trim();
+      if (dropMatch) result.dropLocation = dropMatch[1].trim();
+    }
+
+    // 4. Vehicle category detection
+    if (/innova|crysta|ertiga|marazzo|muv|7\s*seater/i.test(raw)) {
+      result.category = 'MUV';
+    } else if (/suv|scorpio|harrier|xuv|creta|nexon/i.test(raw)) {
+      result.category = 'SUV';
+    } else if (/ev|electric|nexon\s*ev/i.test(raw)) {
+      result.category = 'EV';
+    } else if (/dzire|aura|etios|amaze|sedan/i.test(raw)) {
+      result.category = 'Sedan';
+    }
+
+    // 5. Trip type detection
+    if (/airport|t1|t2|flight/i.test(raw)) {
+      result.tripType = 'Airport';
+    } else if (/local|hourly|8hr|8\s*hours|package/i.test(raw)) {
+      result.tripType = 'Local';
+    } else if (/self\s*drive|rental|rent/i.test(raw)) {
+      result.tripType = 'Rental';
+    } else {
+      result.tripType = 'Outstation';
+    }
+
+    // 6. Rate / Fare extraction
+    const fareMatch = raw.match(/(?:rate|fare|budget|rs\.?|₹|inr)\s*[:\-]?\s*(\d{1,6})(?:\s*k)?/i);
+    if (fareMatch) {
+      let fareVal = Number(fareMatch[1]);
+      if (raw.toLowerCase().includes(fareMatch[1] + 'k')) fareVal *= 1000;
+      if (fareVal >= 500) {
+        result.baseFare = fareVal;
+      }
+    }
+
+    // 7. Date extraction
+    const dateNumMatch = raw.match(/(\d{1,2})[\/\-\. ]([a-zA-Z]{3,9}|\d{1,2})/);
+    if (dateNumMatch) {
+      const today = new Date();
+      const day = parseInt(dateNumMatch[1], 10);
+      const targetDate = new Date(today.getFullYear(), today.getMonth(), day, 8, 0, 0);
+      if (targetDate.getTime() < today.getTime()) {
+        targetDate.setMonth(today.getMonth() + 1);
+      }
+      result.startDateTime = targetDate.toISOString().slice(0, 16);
+      const end = new Date(targetDate.getTime() + 86400000 * 2);
+      result.endDateTime = end.toISOString().slice(0, 16);
+    }
+
+    result.notes = `Auto-parsed from WhatsApp:\n"${raw.slice(0, 100)}..."`;
+    return result;
+  };
+
+  // Staff / RBAC Role Switcher
+  const switchStaffRole = (role = 'owner') => {
+    if (!authUser) return;
+    setAuthUser(prev => ({
+      ...prev,
+      role
+    }));
   };
 
   // Settle Customer Dues in CRM
@@ -1082,10 +1510,34 @@ export const AppProvider = ({ children }) => {
     setVehicles(prev => [newVeh, ...prev]);
   };
 
+  // Phone Number Sanitizer & Formatter (Prevents duplicate +91 prefixes)
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return '';
+    const str = String(phone).trim();
+    // Clean out any repeating +91 prefix
+    let cleaned = str.replace(/^(\+91\s*)+/i, '').trim();
+    // Also remove leading 91 if full 12 digits
+    const pureDigits = cleaned.replace(/\D/g, '');
+    if (pureDigits.length === 12 && pureDigits.startsWith('91')) {
+      const ten = pureDigits.slice(2);
+      return `+91 ${ten.slice(0, 5)} ${ten.slice(5, 10)}`;
+    }
+    if (pureDigits.length === 10) {
+      return `+91 ${pureDigits.slice(0, 5)} ${pureDigits.slice(5, 10)}`;
+    }
+    if (pureDigits.length > 0) {
+      return `+91 ${cleaned}`;
+    }
+    return str;
+  };
+
   // Add Driver
   const addDriver = (driverData) => {
+    const cleanPhone = formatPhoneNumber(driverData.phone);
     const newDrv = {
       ...driverData,
+      phone: cleanPhone,
+      whatsapp: driverData.whatsapp ? formatPhoneNumber(driverData.whatsapp) : cleanPhone,
       id: `drv-${Date.now().toString().slice(-4)}`,
       status: driverData.status || 'Available',
       dlExpiry: driverData.dlExpiry || '2028-01-01'
@@ -1093,15 +1545,96 @@ export const AppProvider = ({ children }) => {
     setDrivers(prev => [newDrv, ...prev]);
   };
 
+  // Update Driver
+  const updateDriver = (driverId, updatedData) => {
+    const cleanPhone = updatedData.phone ? formatPhoneNumber(updatedData.phone) : undefined;
+    const cleanWhatsapp = updatedData.whatsapp ? formatPhoneNumber(updatedData.whatsapp) : (cleanPhone || undefined);
+
+    let oldDrv = null;
+    setDrivers(prev => prev.map(d => {
+      if (d.id === driverId) {
+        oldDrv = d;
+        return {
+          ...d,
+          ...updatedData,
+          phone: cleanPhone || d.phone,
+          whatsapp: cleanWhatsapp || d.whatsapp
+        };
+      }
+      return d;
+    }));
+
+    // Update associated bookings if driver name or phone changed
+    if (oldDrv && (updatedData.name || cleanPhone)) {
+      setBookings(prev => prev.map(b => {
+        if (b.driverId === driverId || (oldDrv.name && b.driverName === oldDrv.name)) {
+          return {
+            ...b,
+            driverName: updatedData.name || b.driverName,
+            driverPhone: cleanPhone || b.driverPhone
+          };
+        }
+        return b;
+      }));
+    }
+  };
+
+  // Delete Driver
+  const deleteDriver = (driverId) => {
+    setDrivers(prev => prev.filter(d => d.id !== driverId));
+  };
+
   // Add Customer
   const addCustomer = (customerData) => {
+    const cleanPhone = formatPhoneNumber(customerData.phone);
     const newCust = {
       ...customerData,
+      phone: cleanPhone,
+      whatsapp: customerData.whatsapp ? formatPhoneNumber(customerData.whatsapp) : cleanPhone,
       id: `cust-${Date.now().toString().slice(-4)}`,
       totalBookings: 0,
       pendingBalance: 0
     };
     setCustomers(prev => [newCust, ...prev]);
+  };
+
+  // Update Customer
+  const updateCustomer = (customerId, updatedData) => {
+    const cleanPhone = updatedData.phone ? formatPhoneNumber(updatedData.phone) : undefined;
+    const cleanWhatsapp = updatedData.whatsapp ? formatPhoneNumber(updatedData.whatsapp) : (cleanPhone || undefined);
+
+    let oldCust = null;
+    setCustomers(prev => prev.map(c => {
+      if (c.id === customerId) {
+        oldCust = c;
+        return {
+          ...c,
+          ...updatedData,
+          phone: cleanPhone || c.phone,
+          whatsapp: cleanWhatsapp || c.whatsapp
+        };
+      }
+      return c;
+    }));
+
+    // Update associated bookings if customer name or phone changed
+    if (oldCust && (updatedData.name || cleanPhone)) {
+      setBookings(prev => prev.map(b => {
+        if (b.customerId === customerId || (oldCust.name && b.customerName === oldCust.name)) {
+          return {
+            ...b,
+            customerName: updatedData.name || b.customerName,
+            customerPhone: cleanPhone || b.customerPhone
+          };
+        }
+        return b;
+      }));
+    }
+  };
+
+  // Delete Customer
+  const deleteCustomer = (customerId) => {
+    setCustomers(prev => prev.filter(c => c.id !== customerId));
   };
 
   // Format Currency
@@ -1124,9 +1657,37 @@ export const AppProvider = ({ children }) => {
   };
 
   const loginUser = (userData) => {
-    const user = {
-      name: userData.name || 'Fleet Owner',
-      phone: userData.phone || '9876543210',
+    const rawInputPhone = (userData.phone || '').replace(/\D/g, '');
+    
+    // Auto-detect if phone belongs to a Driver in the fleet
+    const matchedDriver = drivers.find(d => {
+      const cleanDrvPhone = (d.phone || '').replace(/\D/g, '');
+      return cleanDrvPhone.endsWith(rawInputPhone.slice(-10)) || (rawInputPhone.length >= 10 && cleanDrvPhone.includes(rawInputPhone.slice(-10)));
+    });
+
+    if (matchedDriver) {
+      const driverUser = {
+        role: 'driver',
+        driverId: matchedDriver.id,
+        name: matchedDriver.name,
+        phone: matchedDriver.phone,
+        businessName: business.name || 'Shree Ganesh Tours & Travels',
+        city: business.city || 'Pune, MH',
+        payoutType: matchedDriver.payoutType || 'Salary',
+        token: `gd_driver_token_${Date.now()}`,
+        isDemo: Boolean(userData.isDemo)
+      };
+      setAuthUser(driverUser);
+      setDriverActiveTab('duty');
+      setIsAuthModalOpen(false);
+      return driverUser;
+    }
+
+    // Otherwise login as Fleet Owner
+    const ownerUser = {
+      role: 'owner',
+      name: userData.name || business.ownerName || 'Fleet Owner',
+      phone: userData.phone || '9822012345',
       businessName: userData.businessName || business.name || 'My Fleet & Travels',
       city: userData.city || business.city || 'Maharashtra',
       plan: userData.plan || business.membershipPlan || 'Starter (5 Cars)',
@@ -1134,7 +1695,7 @@ export const AppProvider = ({ children }) => {
       token: `gd_token_${Date.now()}`,
       isDemo: Boolean(userData.isDemo)
     };
-    setAuthUser(user);
+    setAuthUser(ownerUser);
     if (userData.businessName) {
       setBusiness(prev => ({
         ...prev,
@@ -1147,10 +1708,12 @@ export const AppProvider = ({ children }) => {
     }
     setIsAuthModalOpen(false);
     setActiveTab('home');
+    return ownerUser;
   };
 
   const registerUser = (registrationData) => {
     const user = {
+      role: 'owner',
       name: registrationData.ownerName || 'New Fleet Owner',
       phone: registrationData.phone,
       businessName: registrationData.businessName || 'My Fleet Services',
@@ -1182,10 +1745,11 @@ export const AppProvider = ({ children }) => {
 
   const quickDemoLogin = () => {
     const demoUser = {
-      name: 'Ramesh Patil',
-      phone: '9876543210',
-      businessName: 'Ramesh Tours & Travels',
-      city: 'Kolhapur, MH',
+      role: 'owner',
+      name: 'Ramesh Gaikwad',
+      phone: '9822012345',
+      businessName: 'Shree Ganesh Tours & Travels',
+      city: 'Pune, MH',
       plan: 'Growth (15 Cars)',
       membershipStatus: 'Active Pro',
       token: 'gd_demo_token',
@@ -1197,10 +1761,288 @@ export const AppProvider = ({ children }) => {
     setActiveTab('home');
   };
 
+  const quickDriverLogin = (driverId = 'drv-01') => {
+    const driver = drivers.find(d => d.id === driverId) || drivers[0];
+    const driverUser = {
+      role: 'driver',
+      driverId: driver.id,
+      name: driver.name,
+      phone: driver.phone,
+      businessName: business.name || 'Shree Ganesh Tours & Travels',
+      city: business.city || 'Pune, MH',
+      payoutType: driver.payoutType || 'Salary',
+      token: `gd_driver_demo_${driver.id}`,
+      isDemo: true
+    };
+    setAuthUser(driverUser);
+    setDriverActiveTab('duty');
+    setIsAuthModalOpen(false);
+  };
+
   const logoutUser = () => {
     setAuthUser(null);
     setIsAuthModalOpen(false);
     setActiveTab('home');
+    setDriverActiveTab('duty');
+  };
+
+  // Driver Actions & Helpers
+  const startDriverTrip = (bookingId, startKm, startPhotoUrl = '') => {
+    const numStartKm = Number(startKm);
+    let targetVehicleId = null;
+    let updatedBooking = null;
+
+    setBookings(prev => prev.map(b => {
+      if (b.id === bookingId) {
+        targetVehicleId = b.vehicleId;
+        updatedBooking = {
+          ...b,
+          status: 'Ongoing',
+          startOdometer: numStartKm,
+          startKm: numStartKm,
+          startPhotoUrl: startPhotoUrl || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=400&q=80',
+          startedAt: new Date().toISOString()
+        };
+        return updatedBooking;
+      }
+      return b;
+    }));
+
+    if (targetVehicleId) {
+      setVehicles(prev => prev.map(v => {
+        if (v.id === targetVehicleId) {
+          return { ...v, status: 'On Trip', odometer: numStartKm };
+        }
+        return v;
+      }));
+    }
+
+    if (authUser?.driverId) {
+      setDrivers(prev => prev.map(d => {
+        if (d.id === authUser.driverId) {
+          return { ...d, status: 'On Trip' };
+        }
+        return d;
+      }));
+    }
+
+    return updatedBooking;
+  };
+
+  const addDriverTripExpense = (bookingId, expenseData) => {
+    const newExp = {
+      id: `exp-${Date.now().toString().slice(-6)}`,
+      type: expenseData.type || 'Toll',
+      category: 'On-Trip Highway Expense',
+      amount: Number(expenseData.amount || 0),
+      vehicleId: expenseData.vehicleId,
+      bookingId: bookingId,
+      driverId: authUser?.driverId,
+      paidBy: 'Driver',
+      date: new Date().toISOString().split('T')[0],
+      notes: expenseData.notes || `${expenseData.type} paid by driver during trip`,
+      receiptPhoto: expenseData.receiptPhoto || null
+    };
+
+    setExpenses(prev => [newExp, ...prev]);
+
+    if (expenseData.type === 'Toll' || expenseData.type === 'Parking') {
+      setBookings(prev => prev.map(b => {
+        if (b.id === bookingId) {
+          const currentToll = Number(b.tollParking || 0);
+          const addedToll = Number(expenseData.amount || 0);
+          const newToll = currentToll + addedToll;
+          const newGross = Number(b.taxableAmount || 0) + Number(b.gstAmount || 0) + newToll;
+          const newPending = Math.max(0, newGross - Number(b.advancePaid || 0));
+          return {
+            ...b,
+            tollParking: newToll,
+            totalFare: newGross,
+            balancePending: newPending
+          };
+        }
+        return b;
+      }));
+    }
+
+    return newExp;
+  };
+
+  const completeDriverTrip = (bookingId, settlementData) => {
+    const targetBooking = bookings.find(b => b.id === bookingId);
+    if (!targetBooking) return null;
+
+    const numEndKm = Number(settlementData.endKm);
+    const numStartKm = Number(targetBooking.startKm || targetBooking.startOdometer || 0);
+    const actualKm = Math.max(0, numEndKm - numStartKm);
+    const estimatedKm = Number(targetBooking.estimatedKm || 0);
+    const ratePerKm = Number(targetBooking.ratePerKm || 14);
+    const extraKm = Math.max(0, actualKm - estimatedKm);
+    const extraKmCharges = extraKm * ratePerKm;
+
+    const baseFare = Number(targetBooking.baseFare || 0);
+    const driverBata = Number(settlementData.driverBata ?? targetBooking.driverBata ?? 0);
+    const tollParking = Number(settlementData.tollParking ?? targetBooking.tollParking ?? 0);
+    const discount = Number(settlementData.discount || 0);
+
+    const taxableAmount = baseFare + extraKmCharges + driverBata - discount;
+    const gstAmount = targetBooking.gstEnabled ? Math.round(taxableAmount * ((targetBooking.gstPercent || 5) / 100)) : 0;
+    const grossTotal = taxableAmount + gstAmount + tollParking;
+    const advancePaid = Number(targetBooking.advancePaid || 0);
+    const netDue = Math.max(0, grossTotal - advancePaid);
+    const finalPaidAmount = Number(settlementData.finalPaidAmount ?? netDue);
+    const balanceRemaining = Math.max(0, netDue - finalPaidAmount);
+    const paymentMode = settlementData.paymentMode || 'Cash';
+
+    const completedBooking = {
+      ...targetBooking,
+      startKm: numStartKm,
+      endKm: numEndKm,
+      actualKm,
+      extraKm,
+      extraKmCharges,
+      driverBata,
+      tollParking,
+      discount,
+      taxableAmount,
+      gstAmount,
+      totalFare: grossTotal,
+      finalPaidAmount,
+      balancePending: balanceRemaining,
+      settlementPaymentMode: paymentMode,
+      settlementNotes: settlementData.notes || `Completed by driver. Meter: ${numStartKm} to ${numEndKm} KM`,
+      status: 'Completed',
+      completedAt: new Date().toISOString()
+    };
+
+    setBookings(prev => prev.map(b => b.id === bookingId ? completedBooking : b));
+
+    if (targetBooking.vehicleId) {
+      setVehicles(prev => prev.map(v => {
+        if (v.id === targetBooking.vehicleId) {
+          return { ...v, status: 'Free', odometer: numEndKm };
+        }
+        return v;
+      }));
+    }
+
+    if (targetBooking.driverId) {
+      setDrivers(prev => prev.map(d => {
+        if (d.id === targetBooking.driverId) {
+          return { ...d, status: 'Available' };
+        }
+        return d;
+      }));
+    }
+
+    if (finalPaidAmount > 0) {
+      recordTransaction({
+        bookingId: targetBooking.id,
+        invoiceNumber: targetBooking.invoiceNumber,
+        type: 'income',
+        category: 'Trip Balance Collection',
+        amount: finalPaidAmount,
+        paymentMode: paymentMode,
+        customerName: targetBooking.customerName,
+        description: `Balance collected by driver ${targetBooking.driverName || ''} (${paymentMode})`,
+        date: new Date().toISOString().split('T')[0]
+      });
+    }
+
+    return completedBooking;
+  };
+
+  const submitDriverCash = (driverId, amount, notes = '') => {
+    const numAmt = Number(amount);
+    if (numAmt <= 0) return;
+
+    const driver = drivers.find(d => d.id === driverId);
+    const driverName = driver?.name || 'Driver';
+
+    recordTransaction({
+      type: 'income',
+      category: 'Driver Cash Handover',
+      amount: numAmt,
+      paymentMode: 'Cash',
+      customerName: driverName,
+      description: `Cash handover from driver ${driverName}: ${notes || 'Daily settlement'}`,
+      date: new Date().toISOString().split('T')[0]
+    });
+
+    const submissionRecord = {
+      id: `sub-${Date.now().toString().slice(-6)}`,
+      driverId,
+      amount: numAmt,
+      date: new Date().toISOString(),
+      notes: notes || 'Office Cash Handover'
+    };
+
+    const existingSubs = JSON.parse(localStorage.getItem('gd_driver_submissions') || '[]');
+    localStorage.setItem('gd_driver_submissions', JSON.stringify([submissionRecord, ...existingSubs]));
+
+    return submissionRecord;
+  };
+
+  const updateDriverStatus = (driverId, status) => {
+    setDrivers(prev => prev.map(d => d.id === driverId ? { ...d, status } : d));
+  };
+
+  const getDriverActiveTrip = (driverId) => {
+    if (!driverId) return null;
+    const ongoing = bookings.find(b => b.driverId === driverId && b.status === 'Ongoing');
+    if (ongoing) return ongoing;
+    return bookings.find(b => b.driverId === driverId && (b.status === 'Driver Assigned' || b.status === 'Confirmed')) || null;
+  };
+
+  const getDriverTrips = (driverId) => {
+    if (!driverId) return [];
+    return bookings.filter(b => b.driverId === driverId).sort((a, b) => new Date(b.startDateTime) - new Date(a.startDateTime));
+  };
+
+  const getDriverCashStats = (driverId) => {
+    if (!driverId) return { cashCollected: 0, totalBata: 0, reimbursableExpenses: 0, cashSubmitted: 0, netCashDue: 0 };
+    
+    const driverBookings = bookings.filter(b => b.driverId === driverId);
+    let cashCollected = 0;
+    let totalBata = 0;
+
+    driverBookings.forEach(b => {
+      if (b.advanceMode === 'Cash') {
+        cashCollected += Number(b.advancePaid || 0);
+      }
+      if (b.status === 'Completed' && (b.settlementPaymentMode === 'Cash' || (!b.settlementPaymentMode && b.advanceMode === 'Cash'))) {
+        cashCollected += Number(b.finalPaidAmount || b.balancePending || 0);
+      }
+      if (b.status === 'Completed' || b.status === 'Ongoing') {
+        totalBata += Number(b.driverBata || 0);
+      }
+    });
+
+    const driverExps = expenses.filter(e => e.driverId === driverId && e.paidBy === 'Driver');
+    const reimbursableExpenses = driverExps.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+    const subs = JSON.parse(localStorage.getItem('gd_driver_submissions') || '[]');
+    const driverSubs = subs.filter(s => s.driverId === driverId);
+    const cashSubmitted = driverSubs.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+
+    const netCashDue = Math.max(0, cashCollected - totalBata - reimbursableExpenses - cashSubmitted);
+
+    return {
+      cashCollected,
+      totalBata,
+      reimbursableExpenses,
+      cashSubmitted,
+      netCashDue
+    };
+  };
+
+  const getDriverVehicle = (driverId) => {
+    if (!driverId) return null;
+    const activeTrip = getDriverActiveTrip(driverId);
+    if (activeTrip && activeTrip.vehicleId) {
+      return vehicles.find(v => v.id === activeTrip.vehicleId) || null;
+    }
+    return vehicles[0] || null;
   };
 
   const value = {
@@ -1215,7 +2057,23 @@ export const AppProvider = ({ children }) => {
     loginUser,
     registerUser,
     quickDemoLogin,
+    quickDriverLogin,
     logoutUser,
+    driverActiveTab,
+    setDriverActiveTab,
+    driverTollModalBooking,
+    setDriverTollModalBooking,
+    driverUpiModalData,
+    setDriverUpiModalData,
+    startDriverTrip,
+    addDriverTripExpense,
+    completeDriverTrip,
+    submitDriverCash,
+    updateDriverStatus,
+    getDriverActiveTrip,
+    getDriverTrips,
+    getDriverCashStats,
+    getDriverVehicle,
     language,
     toggleLanguage,
     t,
@@ -1291,8 +2149,37 @@ export const AppProvider = ({ children }) => {
     addExpense,
     addVehicle,
     addDriver,
+    updateDriver,
+    deleteDriver,
     addCustomer,
-    formatCurrency
+    updateCustomer,
+    isQuickQuoteOpen,
+    setIsQuickQuoteOpen,
+    selectedCorporateCustomer,
+    setSelectedCorporateCustomer,
+    isCaExportOpen,
+    setIsCaExportOpen,
+    isPublicSiteOpen,
+    setIsPublicSiteOpen,
+    serviceModalVehicle,
+    setServiceModalVehicle,
+    inspectionModalBooking,
+    setInspectionModalBooking,
+    parseWhatsAppBookingText,
+    updateVehicleServiceSchedule,
+    getServiceAlerts,
+    saveVehicleInspection,
+    saveDigitalSignature,
+    switchStaffRole,
+    currentStaffRole: authUser?.role || 'Owner',
+    readNotificationIds,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearAllNotifications,
+    getSmartNotifications,
+    getUnreadNotificationCount,
+    formatCurrency,
+    formatPhoneNumber
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

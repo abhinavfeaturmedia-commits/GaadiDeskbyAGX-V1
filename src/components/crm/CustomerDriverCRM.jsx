@@ -28,6 +28,7 @@ export const CustomerDriverCRM = () => {
     addCustomer,
     addDriver,
     formatCurrency,
+    formatPhoneNumber,
     openNewBookingWithPrefill,
     setCustomerSettlementData,
     setRenewalModalData,
@@ -169,7 +170,7 @@ export const CustomerDriverCRM = () => {
                       <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
                     </div>
                     <p className="text-[11px] text-[#4B5563] font-semibold">
-                      +91 {cust.phone} • {cust.type}
+                      {formatPhoneNumber(cust.phone)} • {cust.type}
                     </p>
                   </div>
                 </div>
@@ -185,7 +186,7 @@ export const CustomerDriverCRM = () => {
               {cust.address && (
                 <p className="text-[11px] text-[#4B5563] bg-[#F8F6F0] p-2 rounded-xl border border-[#E5DFD3] flex items-center justify-between">
                   <span>📍 {cust.address} {cust.gstin ? `• GSTIN: ${cust.gstin}` : ''}</span>
-                  <span className="text-[10px] text-blue-600 font-bold hidden sm:inline">View Trips History →</span>
+                  <span className="text-[10px] text-blue-600 font-bold hidden sm:inline">View / Edit Details →</span>
                 </p>
               )}
 
@@ -244,7 +245,7 @@ export const CustomerDriverCRM = () => {
                       <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-amber-800 group-hover:translate-x-0.5 transition-all" />
                     </div>
                     <p className="text-[11px] text-[#4B5563] font-semibold">
-                      +91 {drv.phone}
+                      {formatPhoneNumber(drv.phone)}
                     </p>
                   </div>
                 </div>
@@ -460,6 +461,22 @@ export const CustomerDriverCRM = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Customer Full Detail & Edit Modal */}
+      {selectedCustomer && (
+        <CustomerDetailModal
+          customer={customers.find(c => c.id === selectedCustomer.id) || selectedCustomer}
+          onClose={() => setSelectedCustomer(null)}
+        />
+      )}
+
+      {/* Driver Full Detail & Edit Modal */}
+      {selectedDriver && (
+        <DriverDetailModal
+          driver={drivers.find(d => d.id === selectedDriver.id) || selectedDriver}
+          onClose={() => setSelectedDriver(null)}
+        />
       )}
     </div>
   );
