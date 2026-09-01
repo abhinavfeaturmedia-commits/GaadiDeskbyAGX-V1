@@ -35,6 +35,26 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile Virtual Keyboard Focus & Scroll Protection */
+input, select, textarea {
+  scroll-margin-top: 80px;
+  scroll-margin-bottom: 140px;
+  font-size: 16px; /* Prevents auto-zoom on iOS Safari */
+}
+
+@media (min-width: 640px) {
+  input, select, textarea {
+    font-size: inherit;
+  }
+}
+
+/* Modal Backdrop & Body Lock */
+.modal-backdrop-open {
+  overflow: hidden !important;
+  touch-action: none;
 }
 
 /* Spring-like active tap feel (Emil Kowalski / Apple UI standard) */
@@ -204,19 +224,22 @@ body {
 .phone-shell {
   max-width: 440px;
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   margin: 0 auto;
   background-color: #FAF8F2;
   position: relative;
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 @media (min-width: 768px) {
   .phone-shell {
-    min-height: 890px;
+    min-height: 860px;
     height: 92vh;
+    max-height: 920px;
     border-radius: 46px;
     border: 9px solid #1E232A;
     overflow: hidden;

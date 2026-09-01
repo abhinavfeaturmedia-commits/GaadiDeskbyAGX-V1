@@ -107,6 +107,7 @@ export const AppProvider = ({ children }) => {
   const [isCaExportOpen, setIsCaExportOpen] = useState(false);
   const [isPublicSiteOpen, setIsPublicSiteOpen] = useState(false);
   const [serviceModalVehicle, setServiceModalVehicle] = useState(null);
+  const [selectedVehicleDetail, setSelectedVehicleDetail] = useState(null);
   const [inspectionModalBooking, setInspectionModalBooking] = useState(null);
 
   // Notification Read / Dismissed tracking
@@ -2629,6 +2630,8 @@ export const AppProvider = ({ children }) => {
     setIsPublicSiteOpen,
     serviceModalVehicle,
     setServiceModalVehicle,
+    selectedVehicleDetail,
+    setSelectedVehicleDetail,
     inspectionModalBooking,
     setInspectionModalBooking,
     parseWhatsAppBookingText,

@@ -57,9 +57,9 @@ export const VehicleServiceModal = ({ vehicle, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-fade-in">
-      <div className="bg-white rounded-4xl max-w-[420px] w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#E5DFD3] overflow-hidden">
+      <div className="bg-white rounded-3xl sm:rounded-4xl max-w-[440px] w-full max-h-[88vh] flex flex-col shadow-2xl border border-[#E5DFD3] overflow-hidden">
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-[#E5DFD3] flex items-center justify-between bg-[#F8F6F0]">
+        <div className="px-5 py-3.5 border-b border-[#E5DFD3] flex items-center justify-between bg-[#F8F6F0] shrink-0">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 rounded-2xl bg-[#111827] text-[#D4F05B] flex items-center justify-center font-black text-xs shadow-xs">
               <Wrench className="w-4 h-4" />

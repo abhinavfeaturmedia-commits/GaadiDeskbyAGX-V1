@@ -149,7 +149,10 @@ export const DriverShell = ({ children }) => {
       </div>
 
       {/* Main Content View with Smooth Scroll */}
-      <div className="flex-1 overflow-y-auto px-5 pb-28 pt-3 no-scrollbar">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-5 pb-32 pt-3 no-scrollbar overscroll-y-contain"
+        style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+      >
         {children}
       </div>
 

@@ -115,10 +115,16 @@ export const TripDetailModal = ({ booking, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
-      <div className="bg-[#F8F6F0] w-full max-w-lg rounded-t-3xl sm:rounded-4xl max-h-[92vh] flex flex-col shadow-2xl border-2 border-[#E5DFD3] overflow-hidden">
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-fade-in"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-[#F8F6F0] w-full max-w-[440px] rounded-3xl sm:rounded-4xl max-h-[88vh] flex flex-col shadow-2xl border-2 border-[#E5DFD3] overflow-hidden"
+      >
         {/* Modal Header */}
-        <div className="bg-white px-5 py-4 border-b border-[#E5DFD3] flex items-center justify-between sticky top-0 z-10">
+        <div className="bg-white px-5 py-3.5 border-b border-[#E5DFD3] flex items-center justify-between sticky top-0 z-10 shrink-0">
           <div className="flex items-center space-x-2.5">
             <div
               className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold shadow-xs ${

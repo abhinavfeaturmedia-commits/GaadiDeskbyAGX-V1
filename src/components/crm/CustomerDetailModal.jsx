@@ -125,10 +125,10 @@ export const CustomerDetailModal = ({ customer, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
-      <div className="bg-[#F8F6F0] w-full max-w-xl rounded-t-3xl sm:rounded-4xl max-h-[92vh] flex flex-col shadow-2xl border-2 border-[#E5DFD3] overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-fade-in">
+      <div className="bg-[#F8F6F0] w-full max-w-[440px] rounded-3xl sm:rounded-4xl max-h-[88vh] flex flex-col shadow-2xl border-2 border-[#E5DFD3] overflow-hidden">
         {/* Header */}
-        <div className="bg-white px-5 py-4 border-b border-[#E5DFD3] flex items-center justify-between sticky top-0 z-10">
+        <div className="bg-white px-5 py-3.5 border-b border-[#E5DFD3] flex items-center justify-between sticky top-0 z-10 shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-900 flex items-center justify-center font-black shadow-xs">
               {customer.type === 'Corporate' ? <Building className="w-5 h-5" /> : <Users className="w-5 h-5" />}

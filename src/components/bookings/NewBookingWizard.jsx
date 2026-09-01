@@ -271,9 +271,9 @@ export const NewBookingWizard = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 z-50 animate-fade-in">
-      <div className="bg-[#F8F6F0] rounded-4xl max-w-[440px] w-full max-h-[92vh] flex flex-col shadow-2xl border-2 border-[#E5DFD3] overflow-hidden">
+      <div className="bg-[#F8F6F0] rounded-3xl sm:rounded-4xl max-w-[440px] w-full max-h-[88vh] flex flex-col shadow-2xl border-2 border-[#E5DFD3] overflow-hidden">
         {/* Header */}
-        <div className="bg-white px-5 py-4 border-b border-[#E5DFD3] flex items-center justify-between">
+        <div className="bg-white px-5 py-3.5 border-b border-[#E5DFD3] flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-2">
             <div className="w-8 h-8 rounded-xl bg-[#111827] text-white flex items-center justify-center text-xs font-black">
               {step}/4

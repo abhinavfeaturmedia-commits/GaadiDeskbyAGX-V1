@@ -22,16 +22,49 @@ export const MobileShell = ({ children }) => {
     business,
     activeTab,
     setActiveTab,
+    isNewBookingOpen,
     setIsNewBookingOpen,
+    selectedTripDetailBooking,
+    settlementBooking,
+    selectedInvoiceBooking,
+    whatsAppData,
+    isNotificationsOpen,
+    setIsNotificationsOpen,
+    isMembershipOpen,
+    setIsMembershipOpen,
+    isQuickQuoteOpen,
+    selectedCorporateCustomer,
+    isCaExportOpen,
+    isPublicSiteOpen,
+    serviceModalVehicle,
+    selectedVehicleDetail,
+    renewalModalData,
+    customerSettlementData,
     getDocumentAlerts,
     getUnreadNotificationCount,
-    setIsNotificationsOpen,
-    setIsMembershipOpen,
     quickDriverLogin,
     isCloudConnected,
     cloudSyncStatus,
     syncWithCloud
   } = useApp();
+
+  const isAnyModalOpen = Boolean(
+    isNewBookingOpen ||
+    selectedTripDetailBooking ||
+    settlementBooking ||
+    selectedInvoiceBooking ||
+    whatsAppData ||
+    isNotificationsOpen ||
+    isMembershipOpen ||
+    isQuickQuoteOpen ||
+    selectedCorporateCustomer ||
+    isCaExportOpen ||
+    isPublicSiteOpen ||
+    serviceModalVehicle ||
+    selectedVehicleDetail ||
+    renewalModalData ||
+    customerSettlementData
+  );
 
   const notifCounts = getUnreadNotificationCount ? getUnreadNotificationCount() : { total: 0, urgent: 0 };
   const badgeCount = notifCounts.total;
@@ -56,7 +89,7 @@ export const MobileShell = ({ children }) => {
   return (
     <div className="phone-shell font-sans text-text-primary bg-canvas selection:bg-accent-peach selection:text-white">
       {/* App Header Bar (Avatar + Dynamic Time Greeting + Language/Notification Controls) */}
-      <div className="px-5 pt-4 pb-2.5 flex items-center justify-between">
+      <div className="px-5 pt-4 pb-2.5 flex items-center justify-between shrink-0">
         {/* Left: Avatar & Friendly Greeting */}
         <div className="flex items-center space-x-3">
           <div
@@ -146,12 +179,17 @@ export const MobileShell = ({ children }) => {
       </div>
 
       {/* Main Content View with Smooth Scroll */}
-      <div className="flex-1 overflow-y-auto px-5 pb-28 pt-1 no-scrollbar">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-5 pb-32 pt-1 no-scrollbar overscroll-y-contain"
+        style={{ touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }}
+      >
         {children}
       </div>
 
-      {/* Floating Bottom Navigation Dock (1:1 with app_ui_ux.jpg floating dock bar) */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-[440px] mx-auto px-5 pb-5 pt-2 pointer-events-none z-30">
+      {/* Floating Bottom Navigation Dock (Hidden smoothly whenever any modal is open) */}
+      <div className={`fixed bottom-0 left-0 right-0 max-w-[440px] mx-auto px-5 pb-5 pt-2 pointer-events-none z-30 transition-all duration-300 ${
+        isAnyModalOpen ? 'translate-y-28 opacity-0' : 'translate-y-0 opacity-100'
+      }`}>
         <div className="frosted-dock rounded-full px-2.5 py-1.5 flex items-center justify-between pointer-events-auto shadow-dock border border-white/80">
           {/* Home Tab */}
           <button

@@ -25,6 +25,7 @@ import { CorporateInvoiceModal } from './components/corporate/CorporateInvoiceMo
 import { CAExportModal } from './components/export/CAExportModal';
 import { PublicMiniSiteModal } from './components/publicsite/PublicMiniSiteModal';
 import { VehicleServiceModal } from './components/fleet/VehicleServiceModal';
+import { VehicleDetailModal } from './components/fleet/VehicleDetailModal';
 import { VehicleInspectionModal } from './components/inspection/VehicleInspectionModal';
 
 // Driver Views & Modals
@@ -66,6 +67,8 @@ const MainContent = () => {
     setIsPublicSiteOpen,
     serviceModalVehicle,
     setServiceModalVehicle,
+    selectedVehicleDetail,
+    setSelectedVehicleDetail,
     inspectionModalBooking,
     setInspectionModalBooking,
     saveVehicleInspection
@@ -194,6 +197,14 @@ const MainContent = () => {
             <VehicleServiceModal
               vehicle={serviceModalVehicle}
               onClose={() => setServiceModalVehicle(null)}
+            />
+          )}
+
+          {/* 360° Vehicle Passport & Detail Modal */}
+          {selectedVehicleDetail && (
+            <VehicleDetailModal
+              vehicle={selectedVehicleDetail}
+              onClose={() => setSelectedVehicleDetail(null)}
             />
           )}
 

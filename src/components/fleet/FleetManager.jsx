@@ -14,8 +14,10 @@ import {
   X,
   Clock,
   Filter,
-  Wrench
+  Wrench,
+  ChevronRight
 } from 'lucide-react';
+import { VehicleDetailModal } from './VehicleDetailModal';
 
 export const FleetManager = () => {
   const {
@@ -26,7 +28,8 @@ export const FleetManager = () => {
     checkVehicleClash,
     isNewVehicleOpen,
     setIsNewVehicleOpen,
-    setServiceModalVehicle
+    setServiceModalVehicle,
+    setSelectedVehicleDetail
   } = useApp();
 
   const [filterCategory, setFilterCategory] = useState('All');
@@ -184,92 +187,94 @@ export const FleetManager = () => {
           return (
             <div
               key={veh.id}
-              className="bg-white rounded-3xl p-4 border border-card-border shadow-soft space-y-3 hover:shadow-soft-lg transition-all"
+              className="bg-white rounded-3xl p-4 border border-card-border shadow-soft space-y-3 hover:shadow-soft-lg transition-all group"
             >
-              {/* Top Row: Plate + Status Pill */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-extrabold text-[#1E232A] tracking-wider">
-                    {veh.plate}
-                  </span>
-                  <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                    {veh.ownership}
-                  </span>
+              {/* Clickable Card Body for 360° Profile */}
+              <div
+                onClick={() => setSelectedVehicleDetail(veh)}
+                className="cursor-pointer space-y-3 tap-active"
+              >
+                {/* Top Row: Plate + Status Pill */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-extrabold text-[#1E232A] tracking-wider group-hover:text-[#F39E36] transition-colors">
+                      {veh.plate}
+                    </span>
+                    <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      {veh.ownership}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-1.5">
+                    <span
+                      className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                        isFree
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : isOnTrip
+                          ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                          : 'bg-red-50 text-red-700 border-red-200'
+                      }`}
+                    >
+                      {veh.status}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-[#8A8782] group-hover:translate-x-0.5 transition-transform" />
+                  </div>
                 </div>
 
-                <span
-                  className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${
-                    isFree
-                      ? 'bg-green-50 text-green-700 border-green-200'
-                      : isOnTrip
-                      ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-                      : 'bg-red-50 text-red-700 border-red-200'
-                  }`}
-                >
-                  {veh.status}
-                </span>
-              </div>
+                {/* Model & Specs */}
+                <div>
+                  <h4 className="text-base font-extrabold text-[#1E232A]">
+                    {veh.brand} {veh.model}
+                  </h4>
+                  <div className="flex items-center space-x-3 text-xs text-text-secondary mt-1">
+                    <span className="flex items-center gap-1">
+                      <Fuel className="w-3.5 h-3.5 text-accent-amber" />
+                      <span>{veh.fuel}</span>
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-sky-600" />
+                      <span>{veh.seats} Seats</span>
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 font-bold text-gray-700">
+                      <Gauge className="w-3.5 h-3.5 text-gray-600" />
+                      <span>{veh.odometer?.toLocaleString()} KM</span>
+                    </span>
+                  </div>
+                </div>
 
-              {/* Model & Specs */}
-              <div>
-                <h4 className="text-base font-extrabold text-[#1E232A]">
-                  {veh.brand} {veh.model}
-                </h4>
-                <div className="flex items-center space-x-3 text-xs text-text-secondary mt-1">
-                  <span className="flex items-center gap-1">
-                    <Fuel className="w-3.5 h-3.5 text-accent-amber" />
-                    <span>{veh.fuel}</span>
-                  </span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 text-sky-600" />
-                    <span>{veh.seats} Seats</span>
-                  </span>
-                  <span>•</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedVehicleForOdo(veh);
-                      setOdoInput(veh.odometer || 0);
-                    }}
-                    title="Click to calibrate odometer"
-                    className="flex items-center gap-1 hover:text-amber-700 font-bold underline decoration-dotted"
-                  >
-                    <Gauge className="w-3.5 h-3.5 text-gray-600" />
-                    <span>{veh.odometer?.toLocaleString()} KM ✏️</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Document & Service Compliance Pills */}
-              <div className="bg-[#FBF8F2] rounded-2xl p-2.5 border border-card-border space-y-1 text-[11px]">
-                <div className="flex items-center justify-between font-semibold text-gray-800">
-                  <span className="text-text-secondary">Insurance Expiry:</span>
-                  <span className="font-bold">{veh.documents?.insuranceExpiry}</span>
-                </div>
-                <div className="flex items-center justify-between font-semibold text-gray-800">
-                  <span className="text-text-secondary">PUC Expiry:</span>
-                  <span className="font-bold">{veh.documents?.pucExpiry}</span>
-                </div>
-                <div className="flex items-center justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200">
-                  <span className="text-text-secondary flex items-center gap-1">
-                    <Wrench className="w-3 h-3 text-[#EA580C]" />
-                    <span>Next Service Due:</span>
-                  </span>
-                  <span className={`font-black text-[10px] px-2 py-0.5 rounded-full ${
-                    ((veh.nextServiceDueOdometer || 70000) - (veh.odometer || 0)) <= 1000
-                      ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                      : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                  }`}>
-                    {((veh.nextServiceDueOdometer || (veh.lastServiceOdometer ? veh.lastServiceOdometer + 10000 : (veh.odometer + 4000))) - (veh.odometer || 0)).toLocaleString()} KM left
-                  </span>
+                {/* Document & Service Compliance Pills */}
+                <div className="bg-[#FBF8F2] rounded-2xl p-2.5 border border-card-border space-y-1 text-[11px]">
+                  <div className="flex items-center justify-between font-semibold text-gray-800">
+                    <span className="text-text-secondary">Insurance Expiry:</span>
+                    <span className="font-bold">{veh.documents?.insuranceExpiry}</span>
+                  </div>
+                  <div className="flex items-center justify-between font-semibold text-gray-800">
+                    <span className="text-text-secondary">PUC Expiry:</span>
+                    <span className="font-bold">{veh.documents?.pucExpiry}</span>
+                  </div>
+                  <div className="flex items-center justify-between font-semibold text-gray-800 pt-1 border-t border-gray-200">
+                    <span className="text-text-secondary flex items-center gap-1">
+                      <Wrench className="w-3 h-3 text-[#EA580C]" />
+                      <span>Next Service Due:</span>
+                    </span>
+                    <span className={`font-black text-[10px] px-2 py-0.5 rounded-full ${
+                      ((veh.nextServiceDueOdometer || 70000) - (veh.odometer || 0)) <= 1000
+                        ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                        : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                    }`}>
+                      {((veh.nextServiceDueOdometer || (veh.lastServiceOdometer ? veh.lastServiceOdometer + 10000 : (veh.odometer + 4000))) - (veh.odometer || 0)).toLocaleString()} KM left
+                    </span>
+                  </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="pt-1 grid grid-cols-3 gap-1.5">
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setSelectedVehicleForCheck(veh);
                     setClashResult(null);
                   }}
@@ -280,7 +285,10 @@ export const FleetManager = () => {
                 </button>
 
                 <button
-                  onClick={() => setServiceModalVehicle(veh)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setServiceModalVehicle(veh);
+                  }}
                   className="py-2 rounded-2xl bg-white border border-[#E5DFD3] text-[#111827] text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-gray-50 tap-active shadow-xs"
                 >
                   <Wrench className="w-3 h-3 text-blue-600" />
@@ -288,7 +296,8 @@ export const FleetManager = () => {
                 </button>
 
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setSelectedVehicleForOdo(veh);
                     setOdoInput(veh.odometer || 0);
                   }}
@@ -588,3 +597,4 @@ export const FleetManager = () => {
     </div>
   );
 };
+
