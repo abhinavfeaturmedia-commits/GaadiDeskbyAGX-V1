@@ -403,7 +403,13 @@ export const DriverActiveDuty = ({ booking }) => {
               <div className="space-y-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => setDriverUpiModalData({ booking, amount: netDue })}
+                  onClick={() => setDriverUpiModalData({
+                    booking,
+                    amount: netDue,
+                    endKm: Number(endKmInput || (currentStartKm + Number(booking.estimatedKm || 250))),
+                    tollParking: booking.tollParking || 0,
+                    driverBata: booking.driverBata || 0
+                  })}
                   className="w-full py-3 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-md tap-active flex items-center justify-center space-x-2"
                 >
                   <QrCode className="w-4 h-4" />

@@ -251,7 +251,7 @@ export const AppProvider = ({ children }) => {
     setIsNewBookingOpen(true);
   };
 
-  // Clash Detection Logic: Checks BOTH Vehicle AND Driver for overlapping bookings with adaptive turnaround buffer
+  // Clash Detection Logic: Checks BOTH Vehicle AND Driver for overlapping bookings, workshop status, and active on-trip lock
   const checkBookingClash = (vehicleId, driverId, startDateTime, endDateTime, excludeBookingId = null, tripType = 'Outstation') => {
     if (!startDateTime || !endDateTime) return { vehicleConflict: null, driverConflict: null };
 
@@ -259,17 +259,59 @@ export const AppProvider = ({ children }) => {
     const BUFFER_MS = (tripType === 'Local' || tripType === 'Airport') ? 30 * 60 * 1000 : 90 * 60 * 1000;
     const reqStart = new Date(startDateTime).getTime() - BUFFER_MS;
     const reqEnd = new Date(endDateTime).getTime() + BUFFER_MS;
+    const now = Date.now();
 
     let vehicleConflict = null;
     let driverConflict = null;
 
+    // 1. Check vehicle operational state (Workshop / Blocked)
+    if (vehicleId) {
+      const vObj = vehicles.find(v => v.id === vehicleId);
+      if (vObj && (vObj.status === 'Workshop' || vObj.status === 'Blocked')) {
+        // If starting within next 72 hours and vehicle is in workshop
+        if (reqStart <= now + 72 * 60 * 60 * 1000) {
+          vehicleConflict = {
+            id: `STATUS_${vObj.status.toUpperCase()}`,
+            vehiclePlate: vObj.plate,
+            startDateTime: new Date().toISOString(),
+            endDateTime: new Date(now + 86400000).toISOString(),
+            status: vObj.status
+          };
+        }
+      }
+    }
+
+    // 2. Check driver operational state (On Leave / Inactive)
+    if (driverId) {
+      const dObj = drivers.find(d => d.id === driverId);
+      if (dObj && (dObj.status === 'On Leave' || dObj.status === 'Inactive')) {
+        if (reqStart <= now + 72 * 60 * 60 * 1000) {
+          driverConflict = {
+            id: `STATUS_${dObj.status.toUpperCase()}`,
+            driverName: dObj.name,
+            startDateTime: new Date().toISOString(),
+            endDateTime: new Date(now + 86400000).toISOString(),
+            status: dObj.status
+          };
+        }
+      }
+    }
+
+    // 3. Check overlapping bookings
     bookings.forEach(b => {
       if (excludeBookingId && b.id === excludeBookingId) return;
       if (b.status === 'Cancelled' || b.status === 'Completed') return;
 
       const bStart = new Date(b.startDateTime).getTime();
       const bEnd = new Date(b.endDateTime).getTime();
-      const isOverlap = reqStart < bEnd && reqEnd > bStart;
+      
+      // Overlap calculation
+      let isOverlap = reqStart < bEnd && reqEnd > bStart;
+
+      // Special safeguard: If booking is currently 'Ongoing', the car/driver is on road right now!
+      if (b.status === 'Ongoing' && reqStart <= now + BUFFER_MS) {
+        isOverlap = true;
+      }
 
       if (isOverlap) {
         if (vehicleId && b.vehicleId === vehicleId && !vehicleConflict) {
@@ -626,9 +668,26 @@ export const AppProvider = ({ children }) => {
     const newId = bookingData.id || `GD-BK-${String(bookings.length + 101).padStart(3, '0')}`;
     const invoiceNumber = bookingData.invoiceNumber || `GD/2026-27/${String(bookings.length + 101).padStart(4, '0')}`;
 
+    // Resolve or create customerId to guarantee relational integrity
+    let resolvedCustomerId = bookingData.customerId || null;
+    let existingCustomerMatch = null;
+
+    if (bookingData.customerName) {
+      existingCustomerMatch = customers.find(c =>
+        c.name.toLowerCase() === bookingData.customerName.trim().toLowerCase() ||
+        (bookingData.customerPhone && c.phone && c.phone.replace(/\D/g, '').slice(-10) === bookingData.customerPhone.replace(/\D/g, '').slice(-10))
+      );
+      if (existingCustomerMatch) {
+        resolvedCustomerId = existingCustomerMatch.id;
+      } else if (!resolvedCustomerId) {
+        resolvedCustomerId = `cust-${Date.now().toString().slice(-4)}`;
+      }
+    }
+
     const newBooking = {
       ...bookingData,
       id: newId,
+      customerId: resolvedCustomerId,
       invoiceNumber,
       createdAt: bookingData.createdAt || new Date().toISOString(),
     };
@@ -658,6 +717,7 @@ export const AppProvider = ({ children }) => {
           bookingId: newId,
           vehicleId: bookingData.vehicleId,
           vehiclePlate: bookingData.vehiclePlate,
+          customerId: resolvedCustomerId,
           customerName: bookingData.customerName,
           notes: `Advance for ${bookingData.pickupLocation} -> ${bookingData.dropLocation}`
         });
@@ -672,6 +732,7 @@ export const AppProvider = ({ children }) => {
             bookingId: newId,
             vehicleId: bookingData.vehicleId,
             vehiclePlate: bookingData.vehiclePlate,
+            customerId: resolvedCustomerId,
             customerName: bookingData.customerName,
             notes: `Additional advance for trip ${newId}`
           });
@@ -682,28 +743,23 @@ export const AppProvider = ({ children }) => {
     // Update Customer details and pending balance delta in CRM
     if (bookingData.customerName) {
       setCustomers(prev => {
-        const match = prev.find(c =>
-          c.name.toLowerCase() === bookingData.customerName.toLowerCase() ||
-          (bookingData.customerPhone && c.phone === bookingData.customerPhone)
-        );
-
         const oldPending = existingBooking ? Number(existingBooking.balancePending || 0) : 0;
         const newPending = Number(bookingData.balancePending || 0);
         const deltaPending = newPending - oldPending;
 
-        if (match) {
+        if (existingCustomerMatch) {
           const updatedCust = {
-            ...match,
-            totalBookings: (match.totalBookings || 0) + (existingBooking ? 0 : 1),
-            pendingBalance: Math.max(0, (match.pendingBalance || 0) + deltaPending),
-            address: bookingData.pickupLocation || match.address
+            ...existingCustomerMatch,
+            totalBookings: (existingCustomerMatch.totalBookings || 0) + (existingBooking ? 0 : 1),
+            pendingBalance: Math.max(0, (existingCustomerMatch.pendingBalance || 0) + deltaPending),
+            address: bookingData.pickupLocation || existingCustomerMatch.address
           };
           supabaseApi.saveCustomer(updatedCust, business?.id || 'biz-001').catch(() => {});
-          return prev.map(c => c.id === match.id ? updatedCust : c);
+          return prev.map(c => c.id === existingCustomerMatch.id ? updatedCust : c);
         } else {
-          // Auto create customer in CRM
+          // Auto create customer in CRM with matching resolvedCustomerId
           const newCust = {
-            id: `cust-${Date.now().toString().slice(-4)}`,
+            id: resolvedCustomerId,
             name: bookingData.customerName,
             phone: bookingData.customerPhone || '9876543210',
             type: 'Personal',
@@ -747,13 +803,17 @@ export const AppProvider = ({ children }) => {
   // Start Trip action: transitions trip to Ongoing, marks vehicle & driver On Trip
   const startTrip = (bookingId, startKm = null) => {
     let updatedBooking = null;
+    const nowIso = new Date().toISOString();
     setBookings(prev => prev.map(b => {
       if (b.id !== bookingId) return b;
+      const resolvedStartKm = Number(startKm || (vehicles.find(v => v.id === b.vehicleId)?.odometer || 0));
       updatedBooking = {
         ...b,
         status: 'Ongoing',
-        actualStartDateTime: new Date().toISOString(),
-        startKm: startKm || (vehicles.find(v => v.id === b.vehicleId)?.odometer || 0)
+        actualStartDateTime: nowIso,
+        startedAt: nowIso,
+        startKm: resolvedStartKm,
+        startOdometer: resolvedStartKm
       };
       return updatedBooking;
     }));
@@ -817,15 +877,22 @@ export const AppProvider = ({ children }) => {
     const finalPaid = Number(finalPaidAmount || 0);
     const totalCollected = prevAdvance + finalPaid;
     const finalBalancePending = Math.max(0, totalFare - totalCollected);
+    const completedTimestamp = new Date().toISOString();
+    const resolvedEndKm = Number(endKm || 0);
+    const resolvedStartKm = Number(startKm || targetBooking.startKm || targetBooking.startOdometer || 0);
 
     // 1. Update Booking
     const updatedBooking = {
       ...targetBooking,
       status: 'Completed',
-      actualEndDateTime: new Date().toISOString(),
-      startKm: Number(startKm || targetBooking.startKm || 0),
-      endKm: Number(endKm || 0),
-      actualKm: Number(actualKm || 0),
+      actualEndDateTime: completedTimestamp,
+      completedAt: completedTimestamp,
+      settledAt: completedTimestamp,
+      startKm: resolvedStartKm,
+      startOdometer: resolvedStartKm,
+      endKm: resolvedEndKm,
+      endOdometer: resolvedEndKm,
+      actualKm: Number(actualKm || (resolvedEndKm - resolvedStartKm) || 0),
       extraKmCharges: Number(extraKmCharges || 0),
       driverBata: Number(driverBata || targetBooking.driverBata || 0),
       tollParking: Number(tollParking || 0),
@@ -834,9 +901,11 @@ export const AppProvider = ({ children }) => {
       gstAmount,
       totalFare,
       advancePaid: totalCollected,
+      finalPaidAmount: finalPaid,
       balancePending: finalBalancePending,
-      settledAt: new Date().toISOString(),
-      settlementMode: settlementPaymentMode
+      settlementMode: settlementPaymentMode,
+      settlementPaymentMode: settlementPaymentMode,
+      settlementNotes: settlementNotes || ''
     };
 
     setBookings(prev => prev.map(b => b.id === bookingId ? updatedBooking : b));
@@ -943,7 +1012,10 @@ export const AppProvider = ({ children }) => {
       // If Cancelled, reverse any customer pending dues in CRM
       if (newStatus === 'Cancelled' && Number(targetBooking.balancePending || 0) > 0) {
         setCustomers(cPrev => cPrev.map(c => {
-          if (c.name.toLowerCase() === targetBooking.customerName.toLowerCase() || c.phone === targetBooking.customerPhone) {
+          const isMatch = (targetBooking.customerId && c.id === targetBooking.customerId) ||
+                          (c.name.toLowerCase() === targetBooking.customerName.toLowerCase()) ||
+                          (targetBooking.customerPhone && c.phone && c.phone.replace(/\D/g, '').slice(-10) === targetBooking.customerPhone.replace(/\D/g, '').slice(-10));
+          if (isMatch) {
             const updatedC = {
               ...c,
               pendingBalance: Math.max(0, (c.pendingBalance || 0) - Number(targetBooking.balancePending || 0))
@@ -2045,8 +2117,10 @@ export const AppProvider = ({ children }) => {
     };
 
     setAuthUser(user);
+    const newBizId = `biz-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6)}`;
     const newBiz = {
       ...business,
+      id: newBizId,
       name: user.businessName,
       ownerName: user.name,
       phone: user.phone,
@@ -2235,10 +2309,13 @@ export const AppProvider = ({ children }) => {
     const balanceRemaining = Math.max(0, netDue - finalPaidAmount);
     const paymentMode = settlementData.paymentMode || 'Cash';
 
+    const nowIso = new Date().toISOString();
     const completedBooking = {
       ...targetBooking,
       startKm: numStartKm,
+      startOdometer: numStartKm,
       endKm: numEndKm,
+      endOdometer: numEndKm,
       actualKm,
       extraKm,
       extraKmCharges,
@@ -2250,15 +2327,37 @@ export const AppProvider = ({ children }) => {
       totalFare: grossTotal,
       finalPaidAmount,
       balancePending: balanceRemaining,
+      settlementMode: paymentMode,
       settlementPaymentMode: paymentMode,
       settlementNotes: settlementData.notes || `Completed by driver. Meter: ${numStartKm} to ${numEndKm} KM`,
       status: 'Completed',
-      completedAt: new Date().toISOString()
+      completedAt: nowIso,
+      actualEndDateTime: nowIso,
+      settledAt: nowIso
     };
 
     setBookings(prev => prev.map(b => b.id === bookingId ? completedBooking : b));
 
     supabaseApi.saveBooking(completedBooking, business?.id || 'biz-001').catch(() => {});
+
+    // Update Customer Pending Balance in Office CRM
+    if (targetBooking.customerName) {
+      setCustomers(prev => prev.map(c => {
+        const isMatch = (targetBooking.customerId && c.id === targetBooking.customerId) ||
+                        (c.name.toLowerCase() === targetBooking.customerName.toLowerCase()) ||
+                        (targetBooking.customerPhone && c.phone && c.phone.replace(/\D/g, '').slice(-10) === targetBooking.customerPhone.replace(/\D/g, '').slice(-10));
+        if (isMatch) {
+          const oldTripPending = Number(targetBooking.balancePending || 0);
+          const newTripPending = balanceRemaining;
+          const currentTotalPending = Number(c.pendingBalance || 0);
+          const updatedPending = Math.max(0, currentTotalPending - oldTripPending + newTripPending);
+          const updatedCust = { ...c, pendingBalance: updatedPending };
+          supabaseApi.saveCustomer(updatedCust, business?.id || 'biz-001').catch(() => {});
+          return updatedCust;
+        }
+        return c;
+      }));
+    }
 
     if (targetBooking.vehicleId) {
       setVehicles(prev => prev.map(v => {
@@ -2290,6 +2389,7 @@ export const AppProvider = ({ children }) => {
         category: 'Trip Balance Collection',
         amount: finalPaidAmount,
         paymentMode: paymentMode,
+        driverId: targetBooking.driverId,
         customerName: targetBooking.customerName,
         notes: `Balance collected by driver ${targetBooking.driverName || ''} (${paymentMode})`,
         date: new Date().toISOString().split('T')[0]
@@ -2311,6 +2411,7 @@ export const AppProvider = ({ children }) => {
       category: 'Driver Cash Handover',
       amount: numAmt,
       paymentMode: 'Cash',
+      driverId: driverId,
       customerName: driverName,
       notes: `Cash handover from driver ${driverName}: ${notes || 'Daily settlement'}`,
       date: new Date().toISOString().split('T')[0]
@@ -2349,6 +2450,7 @@ export const AppProvider = ({ children }) => {
   const getDriverCashStats = (driverId) => {
     if (!driverId) return { cashCollected: 0, totalBata: 0, reimbursableExpenses: 0, cashSubmitted: 0, netCashDue: 0 };
     
+    const driver = drivers.find(d => d.id === driverId);
     const driverBookings = bookings.filter(b => b.driverId === driverId);
     let cashCollected = 0;
     let totalBata = 0;
@@ -2357,7 +2459,8 @@ export const AppProvider = ({ children }) => {
       if (b.advanceMode === 'Cash') {
         cashCollected += Number(b.advancePaid || 0);
       }
-      if (b.status === 'Completed' && (b.settlementPaymentMode === 'Cash' || (!b.settlementPaymentMode && b.advanceMode === 'Cash'))) {
+      const isSettledCash = b.settlementPaymentMode === 'Cash' || b.settlementMode === 'Cash' || (!b.settlementPaymentMode && !b.settlementMode && b.advanceMode === 'Cash');
+      if (b.status === 'Completed' && isSettledCash) {
         cashCollected += Number(b.finalPaidAmount || b.balancePending || 0);
       }
       if (b.status === 'Completed' || b.status === 'Ongoing') {
@@ -2368,10 +2471,18 @@ export const AppProvider = ({ children }) => {
     const driverExps = expenses.filter(e => e.driverId === driverId && e.paidBy === 'Driver');
     const reimbursableExpenses = driverExps.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
-    const subs = JSON.parse(localStorage.getItem('gd_driver_submissions') || '[]');
-    const driverSubs = subs.filter(s => s.driverId === driverId);
-    const cashSubmitted = driverSubs.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+    // Sum submissions from both central transaction ledger and local storage cache
+    const txSubs = transactions.filter(tx =>
+      tx.category === 'Driver Cash Handover' &&
+      (tx.driverId === driverId || (driver && tx.customerName === driver.name))
+    );
+    const txCashSubmitted = txSubs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
 
+    const localSubs = JSON.parse(localStorage.getItem('gd_driver_submissions') || '[]');
+    const driverSubs = localSubs.filter(s => s.driverId === driverId);
+    const localCashSubmitted = driverSubs.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+
+    const cashSubmitted = Math.max(txCashSubmitted, localCashSubmitted);
     const netCashDue = Math.max(0, cashCollected - totalBata - reimbursableExpenses - cashSubmitted);
 
     return {

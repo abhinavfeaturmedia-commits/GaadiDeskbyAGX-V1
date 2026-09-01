@@ -37,9 +37,25 @@ export const MobileShell = ({ children }) => {
   const badgeCount = notifCounts.total;
   const isUrgent = notifCounts.urgent > 0;
 
+  // Dynamic Time-Based Greeting Logic
+  const getGreetingData = () => {
+    const hour = new Date().getHours();
+    if (hour >= 4 && hour < 12) {
+      return { text: t('greetingMorning'), icon: '☀️' };
+    } else if (hour >= 12 && hour < 17) {
+      return { text: t('greetingAfternoon'), icon: '🌤️' };
+    } else if (hour >= 17 && hour < 21) {
+      return { text: t('greetingEvening'), icon: '🌆' };
+    } else {
+      return { text: t('greetingNight'), icon: '🌙' };
+    }
+  };
+
+  const greeting = getGreetingData();
+
   return (
     <div className="phone-shell font-sans text-text-primary bg-canvas selection:bg-accent-peach selection:text-white">
-      {/* App Header Bar (Avatar + Good Morning + Language/Notification Controls) */}
+      {/* App Header Bar (Avatar + Dynamic Time Greeting + Language/Notification Controls) */}
       <div className="px-5 pt-4 pb-2.5 flex items-center justify-between">
         {/* Left: Avatar & Friendly Greeting */}
         <div className="flex items-center space-x-3">
@@ -57,8 +73,8 @@ export const MobileShell = ({ children }) => {
           </div>
           <div>
             <div className="text-[11px] font-semibold text-text-secondary flex items-center gap-1">
-              <span>{t('greetingMorning')}</span>
-              <span className="text-amber-500 text-xs">☀️</span>
+              <span>{greeting.text}</span>
+              <span className="text-amber-500 text-xs">{greeting.icon}</span>
             </div>
             <h2 className="text-sm font-extrabold text-[#1E232A] leading-tight truncate max-w-[160px]">
               {business.ownerName || 'Ramesh Gaikwad'}
@@ -136,31 +152,31 @@ export const MobileShell = ({ children }) => {
 
       {/* Floating Bottom Navigation Dock (1:1 with app_ui_ux.jpg floating dock bar) */}
       <div className="fixed bottom-0 left-0 right-0 max-w-[440px] mx-auto px-5 pb-5 pt-2 pointer-events-none z-30">
-        <div className="frosted-dock rounded-full px-3 py-2 flex items-center justify-between pointer-events-auto shadow-dock">
+        <div className="frosted-dock rounded-full px-2.5 py-1.5 flex items-center justify-between pointer-events-auto shadow-dock border border-white/80">
           {/* Home Tab */}
           <button
             onClick={() => setActiveTab('home')}
-            className={`flex items-center justify-center transition-all tap-active ${
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all tap-active ${
               activeTab === 'home'
-                ? 'bg-[#D4F05B] text-[#111827] font-black px-4 py-2 rounded-full shadow-glow-lime scale-105'
-                : 'text-[#4B5563] hover:text-[#111827] p-2.5'
+                ? 'bg-[#DDF262] text-[#111827] shadow-glow-lime scale-105'
+                : 'text-[#8A8782] hover:text-[#111827]'
             }`}
             title={t('navHome')}
           >
-            <Home className={`w-5 h-5 ${activeTab === 'home' ? 'stroke-[2.5]' : ''}`} />
+            <Home className={`w-5 h-5 ${activeTab === 'home' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
           </button>
 
           {/* Trips Tab */}
           <button
             onClick={() => setActiveTab('trips')}
-            className={`flex items-center justify-center transition-all tap-active ${
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all tap-active ${
               activeTab === 'trips'
-                ? 'bg-[#D4F05B] text-[#111827] font-black px-4 py-2 rounded-full shadow-glow-lime scale-105'
-                : 'text-[#4B5563] hover:text-[#111827] p-2.5'
+                ? 'bg-[#DDF262] text-[#111827] shadow-glow-lime scale-105'
+                : 'text-[#8A8782] hover:text-[#111827]'
             }`}
             title={t('navTrips')}
           >
-            <Navigation className={`w-5 h-5 ${activeTab === 'trips' ? 'stroke-[2.5]' : ''}`} />
+            <Navigation className={`w-5 h-5 ${activeTab === 'trips' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
           </button>
 
           {/* Quick Floating + New Booking FAB */}
@@ -169,46 +185,46 @@ export const MobileShell = ({ children }) => {
             className="w-11 h-11 rounded-full bg-[#111827] text-white shadow-md flex items-center justify-center font-black hover:scale-108 transition-transform tap-active border-2 border-white"
             title="Create New Booking"
           >
-            <Plus className="w-5 h-5 stroke-[3] text-[#D4F05B]" />
+            <Plus className="w-5 h-5 stroke-[3] text-[#DDF262]" />
           </button>
 
           {/* Fleet Tab */}
           <button
             onClick={() => setActiveTab('fleet')}
-            className={`flex items-center justify-center transition-all tap-active ${
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all tap-active ${
               activeTab === 'fleet'
-                ? 'bg-[#D4F05B] text-[#111827] font-black px-4 py-2 rounded-full shadow-glow-lime scale-105'
-                : 'text-[#4B5563] hover:text-[#111827] p-2.5'
+                ? 'bg-[#DDF262] text-[#111827] shadow-glow-lime scale-105'
+                : 'text-[#8A8782] hover:text-[#111827]'
             }`}
             title={t('navFleet')}
           >
-            <Car className={`w-5 h-5 ${activeTab === 'fleet' ? 'stroke-[2.5]' : ''}`} />
+            <Car className={`w-5 h-5 ${activeTab === 'fleet' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
           </button>
 
           {/* Money Tab */}
           <button
             onClick={() => setActiveTab('money')}
-            className={`flex items-center justify-center transition-all tap-active ${
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all tap-active ${
               activeTab === 'money'
-                ? 'bg-[#D4F05B] text-[#111827] font-black px-4 py-2 rounded-full shadow-glow-lime scale-105'
-                : 'text-[#4B5563] hover:text-[#111827] p-2.5'
+                ? 'bg-[#DDF262] text-[#111827] shadow-glow-lime scale-105'
+                : 'text-[#8A8782] hover:text-[#111827]'
             }`}
             title={t('navMoney')}
           >
-            <Wallet className={`w-5 h-5 ${activeTab === 'money' ? 'stroke-[2.5]' : ''}`} />
+            <Wallet className={`w-5 h-5 ${activeTab === 'money' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
           </button>
 
           {/* More Tab */}
           <button
             onClick={() => setActiveTab('more')}
-            className={`flex items-center justify-center transition-all tap-active ${
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all tap-active ${
               activeTab === 'more'
-                ? 'bg-[#D4F05B] text-[#111827] font-black px-4 py-2 rounded-full shadow-glow-lime scale-105'
-                : 'text-[#4B5563] hover:text-[#111827] p-2.5'
+                ? 'bg-[#DDF262] text-[#111827] shadow-glow-lime scale-105'
+                : 'text-[#8A8782] hover:text-[#111827]'
             }`}
             title={t('navMore')}
           >
-            <Menu className={`w-5 h-5 ${activeTab === 'more' ? 'stroke-[2.5]' : ''}`} />
+            <Menu className={`w-5 h-5 ${activeTab === 'more' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
           </button>
         </div>
       </div>

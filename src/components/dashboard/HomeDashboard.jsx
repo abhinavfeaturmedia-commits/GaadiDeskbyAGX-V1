@@ -21,7 +21,8 @@ import {
   Play,
   Gauge,
   Zap,
-  Wrench
+  Wrench,
+  IndianRupee
 } from 'lucide-react';
 import { FleetHealthRingWidget } from './FleetHealthRingWidget';
 
@@ -91,27 +92,96 @@ export const HomeDashboard = () => {
 
   return (
     <div className="space-y-4 pt-1 animate-fade-in">
-      {/* 1. Expressive Headline + Quick Action */}
+      {/* 1. Expressive Headline + Quick Quote Action */}
       <div className="flex items-center justify-between pt-1">
         <div className="space-y-0.5">
           <h1 className="text-2xl font-black text-[#111827] tracking-tight leading-snug">
             {t('headerTitle')}
           </h1>
-          <p className="text-xs text-[#4B5563] font-semibold">
+          <p className="text-xs text-[#8A8782] font-bold">
             {business.name} • {business.city} ({vehicles.length} Fleet Cars)
           </p>
         </div>
 
         <button
           onClick={() => setIsQuickQuoteOpen(true)}
-          className="px-3.5 py-1.5 rounded-full bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs font-black flex items-center gap-1.5 shadow-xs hover:bg-amber-100 tap-active"
+          className="px-3.5 py-1.5 rounded-full bg-white border border-[#EFEAE2] text-[#111827] text-xs font-black flex items-center gap-1.5 shadow-soft hover:bg-gray-50 tap-active"
         >
-          <Zap className="w-3.5 h-3.5 text-[#EA580C]" />
+          <Zap className="w-3.5 h-3.5 text-[#F39E36]" />
           <span>Quick Quote</span>
         </button>
       </div>
 
-      {/* 2. Pill Filter Tabs */}
+      {/* 2. Interactive Calendar Day Picker Strip (matching Screen 3 in app_ui_ux.jpg) */}
+      <div className="bg-white rounded-3xl p-3 shadow-soft border border-[#EFEAE2]/80 flex items-center justify-between">
+        {weekDays.map((item, idx) => {
+          const isSelected = selectedDayIndex === idx;
+          return (
+            <button
+              key={idx}
+              onClick={() => setSelectedDayIndex(idx)}
+              className="flex flex-col items-center space-y-1 py-1 px-2.5 rounded-2xl transition-all tap-active"
+            >
+              <span className="text-[11px] font-bold text-[#8A8782]">{item.day}</span>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+                isSelected
+                  ? 'bg-[#F39E36] text-white shadow-sm scale-110'
+                  : 'text-[#111827] hover:bg-gray-100'
+              }`}>
+                {item.date}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 3. 2-Column Bento Metrics Grid (matching Screen 3 in app_ui_ux.jpg) */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Bento 1: Fleet On-Road */}
+        <div
+          onClick={() => setActiveTab('trips')}
+          className="bg-white rounded-3xl p-4 shadow-soft border border-[#EFEAE2]/80 cursor-pointer tap-active transition-all flex flex-col justify-between group"
+        >
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-xl bg-[#EBF7EE] flex items-center justify-center text-emerald-700 shadow-xs">
+              <Car className="w-4 h-4" />
+            </div>
+            <span className="text-[11px] font-bold text-[#8A8782]">{t('carsOnTrip')}</span>
+          </div>
+          <div className="pt-2">
+            <div className="text-xl font-black text-[#111827]">
+              {fleetStats.onTrip} <span className="text-xs font-semibold text-[#8A8782]">/ {vehicles.length}</span>
+            </div>
+            <div className="text-[10px] font-extrabold text-emerald-700 flex items-center gap-1 pt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{fleetStats.free} Ready for trip</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bento 2: Today Revenue */}
+        <div
+          onClick={() => setActiveTab('money')}
+          className="bg-white rounded-3xl p-4 shadow-soft border border-[#EFEAE2]/80 cursor-pointer tap-active transition-all flex flex-col justify-between group"
+        >
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 rounded-xl bg-[#FDF2E2] flex items-center justify-center text-[#F39E36] shadow-xs">
+              <IndianRupee className="w-4 h-4" />
+            </div>
+            <span className="text-[11px] font-bold text-[#8A8782]">{t('todayCollection')}</span>
+          </div>
+          <div className="pt-2">
+            <div className="text-xl font-black text-[#111827]">
+              ₹{(financialStats.totalCollectedToday / 1000).toFixed(1)}k
+            </div>
+            <div className="text-[10px] font-extrabold text-[#F39E36] flex items-center gap-1 pt-0.5">
+              <span>₹{(financialStats.pendingCustomers / 1000).toFixed(1)}k dues</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Category Filter Tabs (Honey Caramel Active Pill matching app_ui_ux.jpg) */}
       <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
         {pillCategories.map(cat => {
           const isActive = activePill === cat.id;
@@ -128,8 +198,8 @@ export const HomeDashboard = () => {
               }}
               className={`px-4 py-1.5 rounded-full text-xs font-black transition-all whitespace-nowrap tap-active ${
                 isActive
-                  ? 'bg-[#111827] text-white shadow-xs scale-102'
-                  : 'bg-white border-2 border-[#E5DFD3] text-[#374151] hover:bg-gray-50'
+                  ? 'bg-[#F39E36] text-white shadow-xs scale-102'
+                  : 'bg-white border border-[#EFEAE2]/80 text-[#8A8782] hover:bg-gray-50'
               }`}
             >
               {cat.label}
@@ -138,20 +208,20 @@ export const HomeDashboard = () => {
         })}
       </div>
 
-      {/* 3. Smart Radar Alert Banner (if any unread alerts) */}
+      {/* 5. Smart Radar Alert Banner (if any unread alerts) */}
       {primaryAlert && (
         <div
           onClick={() => setIsNotificationsOpen(true)}
-          className={`border-2 rounded-3xl p-3.5 flex items-center justify-between cursor-pointer shadow-xs tap-active transition-all ${
+          className={`rounded-3xl p-3.5 flex items-center justify-between cursor-pointer shadow-soft border tap-active transition-all ${
             primaryAlert.severity === 'critical'
-              ? 'bg-rose-50 border-rose-300'
+              ? 'bg-rose-50/80 border-rose-200 text-rose-950'
               : primaryAlert.severity === 'urgent'
-              ? 'bg-amber-50 border-amber-300'
+              ? 'bg-amber-50/80 border-amber-200 text-amber-950'
               : primaryAlert.category === 'trips'
-              ? 'bg-blue-50 border-blue-200'
+              ? 'bg-blue-50/80 border-blue-200 text-blue-950'
               : primaryAlert.category === 'money'
-              ? 'bg-emerald-50 border-emerald-200'
-              : 'bg-yellow-50 border-yellow-200'
+              ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+              : 'bg-yellow-50/80 border-yellow-200 text-yellow-950'
           }`}
         >
           <div className="flex items-center space-x-3">
@@ -180,7 +250,7 @@ export const HomeDashboard = () => {
               <p className="text-xs font-black text-[#111827]">
                 {primaryAlert.title}
               </p>
-              <p className="text-[11px] text-[#4B5563] font-bold line-clamp-1">
+              <p className="text-[11px] text-[#8A8782] font-bold line-clamp-1">
                 {primaryAlert.subtitle}
               </p>
             </div>
@@ -195,11 +265,11 @@ export const HomeDashboard = () => {
         </div>
       )}
 
-      {/* 4. Periodic Maintenance Overdue Alert Banner (if any) */}
+      {/* 6. Periodic Maintenance Overdue Alert Banner (if any) */}
       {serviceAlerts.some(sa => sa.isOverdue) && (
         <div
           onClick={() => openMoreSubView('papers')}
-          className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-3.5 flex items-center justify-between cursor-pointer shadow-xs tap-active"
+          className="bg-rose-50/80 border border-rose-200 rounded-3xl p-3.5 flex items-center justify-between cursor-pointer shadow-soft tap-active"
         >
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-2xl bg-rose-200 flex items-center justify-center text-rose-900 font-bold">
@@ -220,35 +290,35 @@ export const HomeDashboard = () => {
         </div>
       )}
 
-      {/* 4. Fleet Occupancy & Revenue Target Circular Donut Ring Widget */}
+      {/* 7. Fleet Health Ring & Distribution Card (matching Screen 3 in app_ui_ux.jpg) */}
       <FleetHealthRingWidget />
 
-      {/* 5. Fleet Status Pulse Matrix */}
-      <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs space-y-3 stagger-1">
+      {/* 8. Fleet Status Pulse Matrix (Mood-History Style matching Screen 1 in app_ui_ux.jpg) */}
+      <div className="bg-white rounded-3xl p-4 shadow-soft border border-[#EFEAE2]/80 space-y-3 stagger-1">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-black text-[#111827] uppercase tracking-wider">
             {t('fleetPulseTitle')}
           </h3>
           <button
             onClick={() => setActiveTab('fleet')}
-            className="text-[#4B5563] hover:text-[#111827] p-1 font-bold text-xs"
+            className="text-[#8A8782] hover:text-[#111827] p-1 font-bold text-xs"
           >
             View Fleet ➔
           </button>
         </div>
 
-        {/* 5 Circular Status Avatars */}
+        {/* 5 Pastel Status Circles */}
         <div className="flex items-center justify-between pt-1 px-1">
           {/* Free Cars */}
           <div
             onClick={() => setActiveTab('fleet')}
             className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
           >
-            <div className="w-12 h-12 rounded-full bg-[#EBF7EE] border border-green-300 flex items-center justify-center text-green-700 shadow-xs">
+            <div className="w-12 h-12 rounded-full bg-[#EBF7EE] border border-green-200 flex items-center justify-center text-green-700 shadow-xs">
               <span className="text-base">🟢</span>
             </div>
             <span className="text-[11px] font-black text-[#111827]">{fleetStats.free}</span>
-            <span className="text-[9px] font-bold text-[#4B5563]">{t('carsFree')}</span>
+            <span className="text-[9px] font-bold text-[#8A8782]">{t('carsFree')}</span>
           </div>
 
           {/* On-Road */}
@@ -256,11 +326,11 @@ export const HomeDashboard = () => {
             onClick={() => setActiveTab('trips')}
             className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
           >
-            <div className="w-12 h-12 rounded-full bg-[#FEF3C7] border border-amber-300 flex items-center justify-center text-amber-700 shadow-xs">
+            <div className="w-12 h-12 rounded-full bg-[#FEF3C7] border border-amber-200 flex items-center justify-center text-amber-700 shadow-xs">
               <span className="text-base">🚖</span>
             </div>
             <span className="text-[11px] font-black text-[#111827]">{fleetStats.onTrip}</span>
-            <span className="text-[9px] font-bold text-[#4B5563]">{t('carsOnTrip')}</span>
+            <span className="text-[9px] font-bold text-[#8A8782]">{t('carsOnTrip')}</span>
           </div>
 
           {/* Workshop */}
@@ -268,11 +338,11 @@ export const HomeDashboard = () => {
             onClick={() => setActiveTab('fleet')}
             className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
           >
-            <div className="w-12 h-12 rounded-full bg-[#FEE2E2] border border-red-300 flex items-center justify-center text-red-700 shadow-xs">
+            <div className="w-12 h-12 rounded-full bg-[#FEE2E2] border border-red-200 flex items-center justify-center text-red-700 shadow-xs">
               <span className="text-base">🔧</span>
             </div>
             <span className="text-[11px] font-black text-[#111827]">{fleetStats.workshop}</span>
-            <span className="text-[9px] font-bold text-[#4B5563]">{t('carsMaintenance')}</span>
+            <span className="text-[9px] font-bold text-[#8A8782]">{t('carsMaintenance')}</span>
           </div>
 
           {/* Today Collection */}
@@ -280,13 +350,13 @@ export const HomeDashboard = () => {
             onClick={() => setActiveTab('money')}
             className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
           >
-            <div className="w-12 h-12 rounded-full bg-[#E0F2FE] border border-blue-300 flex items-center justify-center text-blue-700 shadow-xs">
+            <div className="w-12 h-12 rounded-full bg-[#E0F2FE] border border-blue-200 flex items-center justify-center text-blue-700 shadow-xs">
               <span className="text-base">💵</span>
             </div>
             <span className="text-[11px] font-black text-[#111827]">
               ₹{(financialStats.totalCollectedToday / 1000).toFixed(1)}k
             </span>
-            <span className="text-[9px] font-bold text-[#4B5563]">{t('todayCollection')}</span>
+            <span className="text-[9px] font-bold text-[#8A8782]">{t('todayCollection')}</span>
           </div>
 
           {/* Expiry Alerts */}
@@ -294,16 +364,16 @@ export const HomeDashboard = () => {
             onClick={() => setIsNotificationsOpen(true)}
             className="flex flex-col items-center space-y-1 cursor-pointer tap-active"
           >
-            <div className="w-12 h-12 rounded-full bg-[#FCE7F3] border border-pink-300 flex items-center justify-center text-pink-700 shadow-xs">
+            <div className="w-12 h-12 rounded-full bg-[#FCE7F3] border border-pink-200 flex items-center justify-center text-pink-700 shadow-xs">
               <span className="text-base">⚠️</span>
             </div>
             <span className="text-[11px] font-black text-[#111827]">{alerts.length}</span>
-            <span className="text-[9px] font-bold text-[#4B5563]">Alerts</span>
+            <span className="text-[9px] font-bold text-[#8A8782]">Alerts</span>
           </div>
         </div>
       </div>
 
-      {/* 5. 6 Master Action Tiles */}
+      {/* 9. Quick Actions Carousel (matching Screen 1 Actions in app_ui_ux.jpg) */}
       <div className="space-y-2 stagger-2">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-xs font-black text-[#111827] uppercase tracking-wider">
@@ -311,7 +381,7 @@ export const HomeDashboard = () => {
           </h3>
           <span
             onClick={() => setIsNewBookingOpen(true)}
-            className="text-xs font-black text-[#EA580C] flex items-center gap-0.5 cursor-pointer hover:underline"
+            className="text-xs font-black text-[#F39E36] flex items-center gap-0.5 cursor-pointer hover:underline"
           >
             <span>+ Create Booking</span>
             <ChevronRight className="w-3.5 h-3.5" />
@@ -322,28 +392,28 @@ export const HomeDashboard = () => {
           {/* Tile 1: New Booking */}
           <div
             onClick={() => setIsNewBookingOpen(true)}
-            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+            className="bg-white rounded-3xl p-4 shadow-soft border border-[#EFEAE2]/80 hover:border-[#F39E36]/50 cursor-pointer transition-all tap-active flex flex-col justify-between group"
           >
-            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
               <PlusCircle className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
               <h4 className="text-sm font-black text-[#111827]">{t('tileNewBooking')}</h4>
-              <p className="text-[10px] text-[#4B5563] font-semibold">{t('tileNewBookingSub')}</p>
+              <p className="text-[10px] text-[#8A8782] font-semibold">{t('tileNewBookingSub')}</p>
             </div>
           </div>
 
           {/* Tile 2: Today's Trips */}
           <div
             onClick={() => setActiveTab('trips')}
-            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+            className="bg-white rounded-3xl p-4 shadow-soft border border-[#EFEAE2]/80 hover:border-[#F39E36]/50 cursor-pointer transition-all tap-active flex flex-col justify-between group"
           >
-            <div className="w-10 h-10 rounded-2xl bg-sky-100 flex items-center justify-center text-sky-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-2xl bg-sky-50 flex items-center justify-center text-sky-700 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
               <Navigation className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
               <h4 className="text-sm font-black text-[#111827]">{t('tileTodayTrips')}</h4>
-              <p className="text-[10px] text-[#4B5563] font-semibold">
+              <p className="text-[10px] text-[#8A8782] font-semibold">
                 {bookings.filter(b => b.status === 'Ongoing').length} active on-road
               </p>
             </div>
@@ -352,14 +422,14 @@ export const HomeDashboard = () => {
           {/* Tile 3: Cars Fleet */}
           <div
             onClick={() => setActiveTab('fleet')}
-            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+            className="bg-white rounded-3xl p-4 shadow-soft border border-[#EFEAE2]/80 hover:border-[#F39E36]/50 cursor-pointer transition-all tap-active flex flex-col justify-between group"
           >
-            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-700 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
               <Car className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
               <h4 className="text-sm font-black text-[#111827]">{t('tileFleet')}</h4>
-              <p className="text-[10px] text-[#4B5563] font-semibold">
+              <p className="text-[10px] text-[#8A8782] font-semibold">
                 {vehicles.length} cars registered
               </p>
             </div>
@@ -368,14 +438,14 @@ export const HomeDashboard = () => {
           {/* Tile 4: Daily Money */}
           <div
             onClick={() => setActiveTab('money')}
-            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+            className="bg-white rounded-3xl p-4 shadow-soft border border-[#EFEAE2]/80 hover:border-[#F39E36]/50 cursor-pointer transition-all tap-active flex flex-col justify-between group"
           >
-            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
               <Wallet className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
               <h4 className="text-sm font-black text-[#111827]">{t('tileMoney')}</h4>
-              <p className="text-[10px] text-[#4B5563] font-semibold">
+              <p className="text-[10px] text-[#8A8782] font-semibold">
                 {formatCurrency(financialStats.pendingCustomers)} due
               </p>
             </div>
@@ -384,38 +454,38 @@ export const HomeDashboard = () => {
           {/* Tile 5: Customers CRM */}
           <div
             onClick={() => openMoreSubView('crm')}
-            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+            className="bg-white rounded-3xl p-4 shadow-soft border border-[#EFEAE2]/80 hover:border-[#F39E36]/50 cursor-pointer transition-all tap-active flex flex-col justify-between group"
           >
-            <div className="w-10 h-10 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-700 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
               <Users className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
               <h4 className="text-sm font-black text-[#111827]">{t('tileCustomers')}</h4>
-              <p className="text-[10px] text-[#4B5563] font-semibold">{t('tileCustomersSub')}</p>
+              <p className="text-[10px] text-[#8A8782] font-semibold">{t('tileCustomersSub')}</p>
             </div>
           </div>
 
           {/* Tile 6: Papers & Vault */}
           <div
             onClick={() => openMoreSubView('papers')}
-            className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs hover:border-[#111827] cursor-pointer transition-all tap-active flex flex-col justify-between group"
+            className="bg-white rounded-3xl p-4 shadow-soft border border-[#EFEAE2]/80 hover:border-[#F39E36]/50 cursor-pointer transition-all tap-active flex flex-col justify-between group"
           >
-            <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-950 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-700 font-bold shadow-xs mb-2 group-hover:scale-105 transition-transform">
               <FileText className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
               <h4 className="text-sm font-black text-[#111827]">RTO Papers Vault</h4>
-              <p className="text-[10px] text-[#4B5563] font-semibold">RC, Insurance, PUC Radar</p>
+              <p className="text-[10px] text-[#8A8782] font-semibold">RC, Insurance, PUC Radar</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 6. Active Trip Spotlight */}
+      {/* 10. Active Trip Spotlight (matching Screen 2 Focus Session in app_ui_ux.jpg) */}
       {ongoingTrip && (
         <div
           onClick={() => setSelectedTripDetailBooking(ongoingTrip)}
-          className="bg-white rounded-3xl p-4 border-2 border-emerald-400 hover:border-emerald-600 shadow-xs space-y-3 stagger-3 cursor-pointer transition-all tap-active group relative"
+          className="bg-white rounded-3xl p-4.5 shadow-soft border border-emerald-200/80 hover:border-emerald-400 space-y-3 stagger-3 cursor-pointer transition-all tap-active group relative"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -425,7 +495,7 @@ export const HomeDashboard = () => {
               </span>
             </div>
             <div className="flex items-center space-x-1.5">
-              <span className="text-[10px] font-black bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+              <span className="text-[10px] font-black bg-emerald-50 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-200">
                 {ongoingTrip.tripType}
               </span>
               <span className="text-[10px] text-emerald-700 font-bold hidden sm:inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
@@ -439,8 +509,8 @@ export const HomeDashboard = () => {
               <h4 className="text-sm font-black text-[#111827] group-hover:text-emerald-900 transition-colors">
                 {ongoingTrip.customerName}
               </h4>
-              <span className="text-[10px] font-bold text-gray-400 group-hover:text-gray-700 transition-colors">
-                Tap for more info ➔
+              <span className="text-[10px] font-bold text-[#8A8782] group-hover:text-gray-700 transition-colors">
+                Tap for info ➔
               </span>
             </div>
             <p className="text-xs text-[#374151] font-bold flex items-center gap-1 mt-0.5 truncate">
@@ -450,13 +520,13 @@ export const HomeDashboard = () => {
             </p>
           </div>
 
-          <div className="bg-[#F8F6F0] rounded-2xl p-2.5 border border-[#E5DFD3] flex items-center justify-between text-xs group-hover:bg-[#f3efe6] transition-colors">
+          <div className="bg-[#FAF8F2] rounded-2xl p-3 border border-[#EFEAE2]/80 flex items-center justify-between text-xs group-hover:bg-[#F3EFE6] transition-colors">
             <div>
               <p className="font-bold text-[#111827]">🚗 {ongoingTrip.vehiclePlate}</p>
-              <p className="text-[11px] text-[#4B5563] font-semibold">Driver: {ongoingTrip.driverName}</p>
+              <p className="text-[11px] text-[#8A8782] font-semibold">Driver: {ongoingTrip.driverName}</p>
             </div>
             <div className="text-right">
-              <p className="font-black text-[#EA580C]">{formatCurrency(ongoingTrip.totalFare)}</p>
+              <p className="font-black text-[#F39E36]">{formatCurrency(ongoingTrip.totalFare)}</p>
               <p className="text-[10px] text-rose-700 font-bold">Due: {formatCurrency(ongoingTrip.balancePending)}</p>
             </div>
           </div>
@@ -468,7 +538,7 @@ export const HomeDashboard = () => {
                   e.stopPropagation();
                   setSettlementBooking(ongoingTrip);
                 }}
-                className="flex-1 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs tap-active"
+                className="flex-1 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-soft tap-active"
               >
                 <Gauge className="w-4 h-4" />
                 <span>Settle Meter & Collect</span>
@@ -479,9 +549,9 @@ export const HomeDashboard = () => {
                   e.stopPropagation();
                   setActiveTab('trips');
                 }}
-                className="flex-1 py-2 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs tap-active"
+                className="flex-1 py-2.5 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-soft tap-active"
               >
-                <Navigation className="w-4 h-4 text-[#D4F05B]" />
+                <Navigation className="w-4 h-4 text-[#DDF262]" />
                 <span>View in Trips Dispatch</span>
               </button>
             )}
@@ -491,7 +561,7 @@ export const HomeDashboard = () => {
                 e.stopPropagation();
                 setSelectedInvoiceBooking(ongoingTrip);
               }}
-              className="px-3.5 py-2 rounded-full bg-white border-2 border-[#E5DFD3] text-[#111827] text-xs font-black flex items-center gap-1 hover:bg-gray-50 tap-active shadow-xs"
+              className="px-4 py-2.5 rounded-full bg-white border border-[#EFEAE2] text-[#111827] text-xs font-black flex items-center gap-1 hover:bg-gray-50 tap-active shadow-soft"
             >
               <span>Bill</span>
             </button>

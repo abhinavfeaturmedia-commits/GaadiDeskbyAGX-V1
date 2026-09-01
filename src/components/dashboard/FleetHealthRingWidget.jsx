@@ -132,7 +132,7 @@ export const FleetHealthRingWidget = () => {
   };
 
   return (
-    <div className="bg-white rounded-3xl p-4 border-2 border-[#E5DFD3] shadow-xs space-y-3 animate-fade-in">
+    <div className="bg-white rounded-3xl p-5 shadow-soft border border-[#EFEAE2]/80 space-y-4 animate-fade-in">
       {/* Header with Title and Mode Switcher */}
       <div className="flex items-center justify-between">
         <div>
@@ -329,6 +329,27 @@ export const FleetHealthRingWidget = () => {
             <span className="text-[9px] font-bold text-[#4B5563] mt-0.5 uppercase tracking-tighter">
               {mode === 'fleet' ? (isHindi ? 'सक्रिय' : 'Active') : (isHindi ? 'लक्ष्य' : 'Goal')}
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Mini Distribution Strip (matching Screen 3 in app_ui_ux.jpg) */}
+      <div className="pt-2 border-t border-[#EFEAE2]/60 flex items-center justify-between px-1">
+        <span className="text-[10px] font-bold text-[#8A8782] uppercase tracking-wider">
+          {isHindi ? 'गाड़ी स्थिति' : 'Fleet Distribution'}
+        </span>
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-[#DDF262]" />
+            <span className="text-[10px] font-extrabold text-[#111827]">{onTripCount} On-Road</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-[#F39E36]" />
+            <span className="text-[10px] font-extrabold text-[#111827]">{freeCount} Free</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-[#85CFF3]" />
+            <span className="text-[10px] font-extrabold text-[#111827]">{workshopCount} Garage</span>
           </div>
         </div>
       </div>

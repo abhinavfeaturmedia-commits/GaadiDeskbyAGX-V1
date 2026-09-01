@@ -21,7 +21,7 @@ export const DriverUpiModal = () => {
 
   if (!driverUpiModalData) return null;
 
-  const { booking, amount } = driverUpiModalData;
+  const { booking, amount, endKm, tollParking, driverBata } = driverUpiModalData;
   const ownerUpiId = business.upiId || 'shreeganesh.tours@okhdfcbank';
   const ownerBizName = business.name || 'Shree Ganesh Tours & Travels';
 
@@ -34,10 +34,17 @@ export const DriverUpiModal = () => {
   };
 
   const handlePaymentConfirmed = () => {
+    const resolvedEndKm = Number(
+      endKm ||
+      booking.endKm ||
+      booking.endOdometer ||
+      (booking.startKm ? booking.startKm + 250 : 64250)
+    );
+
     completeDriverTrip(booking.id, {
-      endKm: Number(booking.endKm || (booking.startKm ? booking.startKm + 250 : 64250)),
-      tollParking: Number(booking.tollParking || 0),
-      driverBata: Number(booking.driverBata || 0),
+      endKm: resolvedEndKm,
+      tollParking: Number(tollParking ?? booking.tollParking ?? 0),
+      driverBata: Number(driverBata ?? booking.driverBata ?? 0),
       paymentMode: 'UPI',
       finalPaidAmount: Number(amount),
       notes: `Direct UPI payment of ${formatCurrency(amount)} verified by passenger.`

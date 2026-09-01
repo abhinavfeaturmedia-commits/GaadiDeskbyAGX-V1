@@ -135,10 +135,32 @@ export const NewBookingWizard = ({ onClose }) => {
     }
   }, [formData.tripType, formData.vehicleId, rateCards, vehicles]);
 
-  // Recalculate Totals
+  // Recalculate Totals with Indian Fleet Outstation Min KM rules
   const calculateTotals = () => {
+    let daysCount = 1;
+    if (formData.startDateTime && formData.endDateTime) {
+      const diffMs = new Date(formData.endDateTime).getTime() - new Date(formData.startDateTime).getTime();
+      if (diffMs > 0) {
+        daysCount = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      }
+    }
+
+    let minKmPerDay = 250;
+    if (formData.tripType === 'Outstation') {
+      const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
+      const category = selectedVehicle?.category || 'Sedan';
+      const matchingRc = rateCards.find(r => r.tripType === 'Outstation' && r.category === category)
+        || rateCards.find(r => r.tripType === 'Outstation');
+      minKmPerDay = matchingRc?.baseKm || matchingRc?.minKmPerDay || 250;
+    }
+
+    const minBillableKm = daysCount * minKmPerDay;
+    const billableKm = formData.tripType === 'Outstation'
+      ? Math.max(Number(formData.estimatedKm || 0), minBillableKm)
+      : Number(formData.estimatedKm || 0);
+
     const kmFare = formData.tripType === 'Outstation'
-      ? Number(formData.estimatedKm || 0) * Number(formData.ratePerKm || 0)
+      ? billableKm * Number(formData.ratePerKm || 0)
       : Number(formData.baseFare || 0);
 
     const subTotal = kmFare + Number(formData.driverBata || 0) + Number(formData.nightHalt || 0) + Number(formData.tollParking || 0);
@@ -148,10 +170,10 @@ export const NewBookingWizard = ({ onClose }) => {
     const totalFare = taxableAmount + gstAmount;
     const balancePending = Math.max(0, totalFare - Number(formData.advancePaid || 0));
 
-    return { taxableAmount, gstAmount, totalFare, balancePending };
+    return { taxableAmount, gstAmount, totalFare, balancePending, billableKm, daysCount, minBillableKm };
   };
 
-  const { taxableAmount, gstAmount, totalFare, balancePending } = calculateTotals();
+  const { taxableAmount, gstAmount, totalFare, balancePending, billableKm, daysCount, minBillableKm } = calculateTotals();
 
   // Clash Check when vehicle or driver or dates change
   const runClashCheck = (vId, dId, start, end) => {
@@ -187,7 +209,7 @@ export const NewBookingWizard = ({ onClose }) => {
     runClashCheck(formData.vehicleId, dId, formData.startDateTime, formData.endDateTime);
   };
 
-  // Submit Booking
+  // Submit Booking with Strict Clash Enforcement and CRM Linkage
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -196,11 +218,33 @@ export const NewBookingWizard = ({ onClose }) => {
       return;
     }
 
+    // STRICT CLASH PREVENTION: Block double booking if conflict exists
+    if (clashError?.vehicle) {
+      alert(`⛔ Double Booking Blocked!\n\nVehicle ${clashError.vehicle.plate} is already assigned to Trip ${clashError.vehicle.bookingId} (${clashError.vehicle.start} to ${clashError.vehicle.end}).\n\nPlease select another vehicle or modify trip timing.`);
+      setStep(3);
+      return;
+    }
+    if (clashError?.driver) {
+      alert(`⛔ Driver Clash Blocked!\n\nDriver ${clashError.driver.driverName} is already assigned to Trip ${clashError.driver.bookingId} (${clashError.driver.start} to ${clashError.driver.end}).\n\nPlease assign another driver or modify trip timing.`);
+      setStep(3);
+      return;
+    }
+
     const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
     const selectedDriver = drivers.find(d => d.id === formData.driverId);
 
+    // Auto-link to existing customer record if phone or name matches
+    const matchedCustomer = customers.find(c =>
+      (formData.customerPhone && c.phone && c.phone.replace(/\D/g, '').slice(-10) === formData.customerPhone.replace(/\D/g, '').slice(-10)) ||
+      (c.name && c.name.toLowerCase() === formData.customerName.trim().toLowerCase())
+    );
+
     const newBookingData = {
       ...formData,
+      customerId: formData.customerId || matchedCustomer?.id || null,
+      daysCount,
+      minKmPerDay: minBillableKm / daysCount,
+      estimatedKm: billableKm,
       vehiclePlate: selectedVehicle ? `${selectedVehicle.plate} (${selectedVehicle.brand} ${selectedVehicle.model})` : '',
       driverName: selectedDriver ? selectedDriver.name : 'Driver Assigned Soon',
       driverPhone: selectedDriver ? selectedDriver.phone : '',
@@ -693,6 +737,15 @@ export const NewBookingWizard = ({ onClose }) => {
                     />
                   </div>
                 </div>
+
+                {formData.tripType === 'Outstation' && (
+                  <div className="p-2.5 bg-amber-50 rounded-2xl border border-amber-200 text-[11px] font-bold text-amber-950 flex items-center justify-between">
+                    <span>Outstation Rule ({daysCount} day{daysCount > 1 ? 's' : ''} × {minBillableKm / daysCount} km/day):</span>
+                    <span className="font-black text-[#111827]">
+                      {billableKm} KM Billable {billableKm > Number(formData.estimatedKm || 0) ? `(Min Applied)` : `(@ Route KM)`}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Self-Drive Rental Specifics (if Rental) */}
@@ -839,9 +892,19 @@ export const NewBookingWizard = ({ onClose }) => {
                   alert("Please enter pickup and drop addresses.");
                   return;
                 }
-                if (step === 3 && !formData.vehicleId) {
-                  alert("Please select a vehicle.");
-                  return;
+                if (step === 3) {
+                  if (!formData.vehicleId) {
+                    alert("Please select a vehicle.");
+                    return;
+                  }
+                  if (clashError?.vehicle) {
+                    alert(`⛔ Double Booking Blocked!\n\nVehicle ${clashError.vehicle.plate} is already assigned to Trip ${clashError.vehicle.bookingId} (${clashError.vehicle.start} to ${clashError.vehicle.end}).\n\nPlease select another vehicle.`);
+                    return;
+                  }
+                  if (clashError?.driver) {
+                    alert(`⛔ Driver Clash Blocked!\n\nDriver ${clashError.driver.driverName} is already assigned to Trip ${clashError.driver.bookingId} (${clashError.driver.start} to ${clashError.driver.end}).\n\nPlease select another driver.`);
+                    return;
+                  }
                 }
                 setStep(prev => prev + 1);
               }}

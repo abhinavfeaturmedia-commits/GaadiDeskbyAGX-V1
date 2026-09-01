@@ -185,7 +185,7 @@ export const mapRateCardFromDb = (row) => ({
 
 export const mapBookingToDb = (b, businessId = 'biz-001') => ({
   id: b.id,
-  business_id: businessId,
+  business_id: b.businessId || b.business_id || businessId,
   invoice_number: b.invoiceNumber || '',
   trip_type: b.tripType || 'Outstation',
   customer_name: b.customerName || '',
@@ -218,12 +218,16 @@ export const mapBookingToDb = (b, businessId = 'biz-001') => ({
   advance_mode: b.advanceMode || '',
   balance_pending: Number(b.balancePending) || 0,
   status: b.status || 'Confirmed',
-  start_odometer: b.startOdometer !== undefined && b.startOdometer !== null ? Number(b.startOdometer) : null,
-  end_odometer: b.endOdometer !== undefined && b.endOdometer !== null ? Number(b.endOdometer) : null,
+  start_odometer: (b.startOdometer !== undefined && b.startOdometer !== null)
+    ? Number(b.startOdometer)
+    : ((b.startKm !== undefined && b.startKm !== null) ? Number(b.startKm) : null),
+  end_odometer: (b.endOdometer !== undefined && b.endOdometer !== null)
+    ? Number(b.endOdometer)
+    : ((b.endKm !== undefined && b.endKm !== null) ? Number(b.endKm) : null),
   start_photo_url: b.startPhotoUrl || '',
   end_photo_url: b.endPhotoUrl || '',
-  started_at: b.startedAt || null,
-  completed_at: b.completedAt || null,
+  started_at: b.startedAt || b.actualStartDateTime || null,
+  completed_at: b.completedAt || b.actualEndDateTime || b.settledAt || null,
   notes: b.notes || '',
   inspection_data: b.inspectionData || {},
   updated_at: new Date().toISOString()
@@ -231,6 +235,7 @@ export const mapBookingToDb = (b, businessId = 'biz-001') => ({
 
 export const mapBookingFromDb = (row) => ({
   id: row.id,
+  businessId: row.business_id,
   invoiceNumber: row.invoice_number,
   tripType: row.trip_type,
   customerName: row.customer_name,
@@ -264,11 +269,16 @@ export const mapBookingFromDb = (row) => ({
   balancePending: Number(row.balance_pending) || 0,
   status: row.status,
   startOdometer: row.start_odometer,
+  startKm: row.start_odometer,
   endOdometer: row.end_odometer,
+  endKm: row.end_odometer,
   startPhotoUrl: row.start_photo_url,
   endPhotoUrl: row.end_photo_url,
   startedAt: row.started_at,
+  actualStartDateTime: row.started_at,
   completedAt: row.completed_at,
+  actualEndDateTime: row.completed_at,
+  settledAt: row.completed_at,
   notes: row.notes,
   inspectionData: row.inspection_data || {},
   createdAt: row.created_at

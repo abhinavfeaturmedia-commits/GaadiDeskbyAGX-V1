@@ -17,8 +17,11 @@ export default {
         'text-secondary': '#374151',
         'text-muted': '#4B5563',
         accent: {
-          lime: '#D4F05B',
-          'lime-light': '#EEFABC',
+          honey: '#F39E36',
+          'honey-light': '#FDF2E2',
+          'honey-dark': '#C97514',
+          lime: '#DDF262',
+          'lime-light': '#F3FCD4',
           'lime-dark': '#7A9600',
           peach: '#EA580C',
           'peach-light': '#FFEDD5',

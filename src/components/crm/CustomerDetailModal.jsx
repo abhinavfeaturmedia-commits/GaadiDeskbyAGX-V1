@@ -58,10 +58,11 @@ export const CustomerDetailModal = ({ customer, onClose }) => {
 
   if (!customer) return null;
 
-  // Filter bookings associated with this customer by name or phone
+  // Filter bookings associated with this customer by relational customerId, or name/phone fallback
   const customerTrips = bookings.filter(b =>
+    (b.customerId && customer.id && b.customerId === customer.id) ||
     (b.customerName && b.customerName.toLowerCase() === customer.name.toLowerCase()) ||
-    (b.customerPhone && customer.phone && b.customerPhone.includes(customer.phone))
+    (b.customerPhone && customer.phone && b.customerPhone.replace(/\D/g, '').slice(-10) === customer.phone.replace(/\D/g, '').slice(-10))
   );
 
   // Financial calculations from actual trips

@@ -20,7 +20,9 @@ export const CorporateInvoiceModal = ({ customer, onClose }) => {
 
   // Find all completed bookings for this customer
   const customerBookings = bookings.filter(b =>
-    (b.customerId === customer?.id || (customer?.name && b.customerName?.toLowerCase() === customer.name.toLowerCase())) &&
+    (b.customerId === customer?.id ||
+     (customer?.name && b.customerName?.toLowerCase() === customer.name.toLowerCase()) ||
+     (customer?.phone && b.customerPhone && b.customerPhone.replace(/\D/g, '').slice(-10) === customer.phone.replace(/\D/g, '').slice(-10))) &&
     b.status === 'Completed'
   );
 
@@ -34,8 +36,15 @@ export const CorporateInvoiceModal = ({ customer, onClose }) => {
 
   const selectedTrips = customerBookings.filter(b => selectedBookingIds.includes(b.id));
 
-  // Computations
-  const totalTaxable = selectedTrips.reduce((sum, b) => sum + Number(b.taxableAmount || (b.totalFare / 1.05)), 0);
+  // Computations with Zero Toll Double-Counting
+  const totalTaxable = selectedTrips.reduce((sum, b) => {
+    if (b.taxableAmount !== undefined && b.taxableAmount !== null && Number(b.taxableAmount) > 0) {
+      return sum + Number(b.taxableAmount);
+    }
+    const tolls = Number(b.tollParking || 0);
+    const fareWithoutTolls = Math.max(0, Number(b.totalFare || 0) - tolls);
+    return sum + (b.gstEnabled ? Math.round(fareWithoutTolls / 1.05) : fareWithoutTolls);
+  }, 0);
   const totalTolls = selectedTrips.reduce((sum, b) => sum + Number(b.tollParking || 0), 0);
   const isGst = Boolean(customer?.gstin || business.gstin);
   const cgstAmount = isGst ? Math.round(totalTaxable * 0.025) : 0;

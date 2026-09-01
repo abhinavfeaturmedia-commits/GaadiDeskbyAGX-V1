@@ -147,10 +147,10 @@ export const MoreMenu = () => {
                   </div>
                   <p className="text-[11px] text-[#4B5563] font-semibold mt-1">
                     {rc.tripType === 'Outstation' 
-                      ? `₹${rc.perKmRate}/km • Min ${rc.minKmPerDay} km/day • Bata ₹${rc.driverBata}`
+                      ? `₹${rc.perKmRate || rc.extraKmRate || 14}/km • Min ${rc.baseKm || rc.minKmPerDay || 250} km/day • Bata ₹${rc.driverBata || 400}`
                       : rc.tripType === 'Rental'
-                      ? `₹${rc.basePrice}/day (Deposit ₹${rc.securityDeposit} • ${rc.fuelPolicy})`
-                      : `Base ₹${rc.basePrice} (${rc.includedHours}h / ${rc.includedKm}km) • Extra ₹${rc.extraKmRate}/km`}
+                      ? `₹${rc.basePrice || 2200}/day (Deposit ₹${rc.securityDeposit || 5000} • ${rc.fuelPolicy || 'Excluding Fuel'})`
+                      : `Base ₹${rc.basePrice || 1800} (${rc.baseHours || rc.includedHours || 8}h / ${rc.baseKm || rc.includedKm || 80}km) • Extra ₹${rc.extraKmRate || 14}/km`}
                   </p>
                 </div>
                 <button

@@ -7,6 +7,7 @@ export const translations = {
     greetingMorning: "Good morning",
     greetingAfternoon: "Good afternoon",
     greetingEvening: "Good evening",
+    greetingNight: "Good evening",
     headerTitle: "Ready for Today's Trips?",
     
     // Bottom Nav
@@ -219,8 +220,9 @@ export const translations = {
     appName: "गाड़ीडेस्क",
     tagline: "आपकी जेब में कैब और रेंटल बिजनेस का डिजिटल ऑफिस",
     greetingMorning: "शुभ प्रभात",
-    greetingAfternoon: "नमस्ते",
+    greetingAfternoon: "शुभ दोपहर",
     greetingEvening: "शुभ संध्या",
+    greetingNight: "शुभ संध्या",
     headerTitle: "आज की ट्रिप्स के लिए तैयार?",
     
     // Bottom Nav
