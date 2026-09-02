@@ -14,19 +14,105 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 /**
- * Checks connectivity with the Supabase PostgreSQL database
- * @returns {Promise<{ isConnected: boolean, error: string | null }>}
+ * Checks connectivity with the Supabase PostgreSQL database and detects if project is paused
+ * @param {number} timeoutMs - Timeout duration in milliseconds
+ * @returns {Promise<{ isConnected: boolean, isPaused: boolean, error: string | null, status: number }>}
  */
-export async function checkSupabaseHealth() {
+export async function checkSupabaseHealth(timeoutMs = 6000) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
   try {
-    const { error } = await supabase.from('businesses').select('id').limit(1);
-    if (error) {
-      console.warn('[Supabase Health Check Warning]:', error.message);
-      return { isConnected: false, error: error.message };
+    const probeUrl = `${supabaseUrl}/rest/v1/businesses?select=id&limit=1`;
+    const response = await fetch(probeUrl, {
+      method: 'GET',
+      headers: {
+        'apikey': supabaseAnonKey,
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'Range-Unit': 'items',
+        'Range': '0-0'
+      },
+      signal: controller ? controller.signal : undefined
+    });
+
+    if (timeoutId) clearTimeout(timeoutId);
+
+    // Supabase returns 503 Service Unavailable or 52x when paused/stopped
+    if (response.status === 503 || response.status === 521 || response.status === 522 || response.status === 523) {
+      console.warn('[Supabase Check]: Project is paused or stopped by administrator (HTTP ' + response.status + ')');
+      broadcastStatus(false, true, `Supabase project paused (HTTP ${response.status})`, response.status);
+      return {
+        isConnected: false,
+        isPaused: true,
+        error: `Supabase project paused (HTTP ${response.status})`,
+        status: response.status
+      };
     }
-    return { isConnected: true, error: null };
+
+    if (response.ok) {
+      broadcastStatus(true, false, null, response.status);
+      return { isConnected: true, isPaused: false, error: null, status: response.status };
+    }
+
+    // Inspect error text for keywords
+    const bodyText = await response.text().catch(() => '');
+    const isPaused = response.status === 503 ||
+                     bodyText.toLowerCase().includes('paused') ||
+                     bodyText.toLowerCase().includes('project is inactive') ||
+                     bodyText.toLowerCase().includes('maintenance');
+
+    broadcastStatus(false, isPaused, bodyText || `HTTP ${response.status}`, response.status);
+    return {
+      isConnected: false,
+      isPaused,
+      error: bodyText || `HTTP ${response.status}`,
+      status: response.status
+    };
   } catch (err) {
-    console.error('[Supabase Health Check Error]:', err);
-    return { isConnected: false, error: err?.message || 'Unknown network error' };
+    if (timeoutId) clearTimeout(timeoutId);
+    const isAbort = err.name === 'AbortError';
+    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+    // If client has active internet but Supabase endpoint is refused / cannot connect,
+    // Supabase project is paused or offline.
+    const isPaused = isOnline;
+    const errMsg = isAbort ? 'Connection timed out' : (err?.message || 'Network error');
+
+    console.warn('[Supabase Health Check Error]:', errMsg, { isPaused, isOnline });
+    broadcastStatus(false, isPaused, errMsg, isAbort ? 408 : 0);
+
+    return {
+      isConnected: false,
+      isPaused,
+      error: errMsg,
+      status: isAbort ? 408 : 0
+    };
   }
 }
+
+/**
+ * Helper to broadcast Supabase project status to any active listener in the app
+ */
+function broadcastStatus(isConnected, isPaused, error, status) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('gaadidesk:supabase_status', {
+      detail: { isConnected, isPaused, error, status }
+    }));
+  }
+}
+
+/**
+ * Check if an error object or response represents a paused Supabase project
+ */
+export function isSupabasePausedError(error) {
+  if (!error) return false;
+  const str = String(error.message || error.details || error || '').toLowerCase();
+  const status = error.status || error.code || 0;
+  return status === 503 ||
+         status === '503' ||
+         str.includes('paused') ||
+         str.includes('503') ||
+         str.includes('service unavailable') ||
+         str.includes('failed to fetch');
+}
+

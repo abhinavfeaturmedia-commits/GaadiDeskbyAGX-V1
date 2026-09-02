@@ -47,10 +47,10 @@ export const FleetHealthRingWidget = () => {
 
   // Helper to compute SVG dash offsets
   const getFleetSegments = () => {
-    // Avoid division by zero
-    const s1Pct = (onTripCount / totalVehicles) || 0.35;
-    const s2Pct = (freeCount / totalVehicles) || 0.45;
-    const s3Pct = (workshopCount / totalVehicles) || 0.20;
+    // Real proportions without mock fallbacks
+    const s1Pct = vehicles.length > 0 ? (onTripCount / totalVehicles) : 0;
+    const s2Pct = vehicles.length > 0 ? (freeCount / totalVehicles) : 0;
+    const s3Pct = vehicles.length > 0 ? (workshopCount / totalVehicles) : 0;
 
     const s1Len = s1Pct * circumference;
     const s2Len = s2Pct * circumference;
@@ -85,9 +85,9 @@ export const FleetHealthRingWidget = () => {
   };
 
   const getRevenueSegments = () => {
-    const totalRevBase = Math.max(dailyTarget, collectedToday + pendingDues);
-    const s1Pct = collectedToday > 0 ? (collectedToday / totalRevBase) : 0.60;
-    const s2Pct = pendingDues > 0 ? (pendingDues / totalRevBase) : 0.25;
+    const totalRevBase = Math.max(1, collectedToday + pendingDues);
+    const s1Pct = (collectedToday + pendingDues > 0) ? (collectedToday / totalRevBase) : 0;
+    const s2Pct = (collectedToday + pendingDues > 0) ? (pendingDues / totalRevBase) : 0;
     const s3Pct = Math.max(0.15, 1 - s1Pct - s2Pct);
 
     const s1Len = s1Pct * circumference;

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { uploadMediaToCloud } from '../../services/storageService';
 import {
   MapPin,
   Navigation,
@@ -16,7 +17,9 @@ import {
   Clock,
   Car,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Loader2,
+  Check
 } from 'lucide-react';
 
 export const DriverActiveDuty = ({ booking }) => {
@@ -37,14 +40,18 @@ export const DriverActiveDuty = ({ booking }) => {
   // Start Trip Form State
   const [showStartForm, setShowStartForm] = useState(false);
   const [startKmInput, setStartKmInput] = useState(booking.startKm || vehicle?.odometer || 64000);
-  const [startPhotoSnapped, setStartPhotoSnapped] = useState(false);
+  const [startPhotoUrl, setStartPhotoUrl] = useState(booking.startPhotoUrl || '');
+  const [isUploadingStartPhoto, setIsUploadingStartPhoto] = useState(false);
+  const startFileRef = useRef(null);
 
   // End Trip Form State
   const [showEndForm, setShowEndForm] = useState(false);
   const currentStartKm = Number(booking.startKm || booking.startOdometer || vehicle?.odometer || 64000);
   const defaultEndKm = currentStartKm + Number(booking.estimatedKm || 250);
   const [endKmInput, setEndKmInput] = useState(booking.endKm || defaultEndKm);
-  const [endPhotoSnapped, setEndPhotoSnapped] = useState(false);
+  const [endPhotoUrl, setEndPhotoUrl] = useState(booking.endPhotoUrl || '');
+  const [isUploadingEndPhoto, setIsUploadingEndPhoto] = useState(false);
+  const endFileRef = useRef(null);
   const [collectionMode, setCollectionMode] = useState('Cash'); // 'Cash' | 'UPI'
   const [settlementNotes, setSettlementNotes] = useState('');
 
@@ -68,6 +75,29 @@ export const DriverActiveDuty = ({ booking }) => {
   const advancePaid = Number(booking.advancePaid || 0);
   const netDue = Math.max(0, grossTotal - advancePaid);
 
+  // Handle Photo Uploads to Supabase Cloud Storage
+  const handleStartPhotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingStartPhoto(true);
+    const res = await uploadMediaToCloud(file, 'trip-meter-snaps', 'start_odometer');
+    if (res.url) {
+      setStartPhotoUrl(res.url);
+    }
+    setIsUploadingStartPhoto(false);
+  };
+
+  const handleEndPhotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingEndPhoto(true);
+    const res = await uploadMediaToCloud(file, 'trip-meter-snaps', 'end_odometer');
+    if (res.url) {
+      setEndPhotoUrl(res.url);
+    }
+    setIsUploadingEndPhoto(false);
+  };
+
   // Handle Start Trip
   const handleStartSubmit = (e) => {
     e.preventDefault();
@@ -75,7 +105,7 @@ export const DriverActiveDuty = ({ booking }) => {
       alert("Please enter a valid starting odometer reading.");
       return;
     }
-    startDriverTrip(booking.id, startKmInput);
+    startDriverTrip(booking.id, startKmInput, startPhotoUrl);
     setShowStartForm(false);
   };
 
@@ -88,6 +118,7 @@ export const DriverActiveDuty = ({ booking }) => {
 
     completeDriverTrip(booking.id, {
       endKm: Number(endKmInput),
+      endPhotoUrl: endPhotoUrl,
       tollParking: totalTripToll,
       driverBata,
       discount: 0,
@@ -282,19 +313,58 @@ export const DriverActiveDuty = ({ booking }) => {
                 </div>
               </div>
 
-              {/* Photo snap simulation button */}
-              <button
-                type="button"
-                onClick={() => setStartPhotoSnapped(prev => !prev)}
-                className={`w-full py-2.5 rounded-2xl border-2 border-dashed flex items-center justify-center space-x-2 text-xs font-black transition tap-active ${
-                  startPhotoSnapped
-                    ? 'border-green-500 bg-green-50 text-green-800'
-                    : 'border-[#E5DFD3] bg-[#F8F6F0] text-[#111827]'
-                }`}
-              >
-                <Camera className="w-4 h-4" />
-                <span>{startPhotoSnapped ? '✓ Odometer Photo Attached' : '📸 Snap Odometer Photo (Optional)'}</span>
-              </button>
+              {/* Real Camera & Photo Capture for Start Odometer */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                ref={startFileRef}
+                onChange={handleStartPhotoChange}
+                className="hidden"
+              />
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => startFileRef.current?.click()}
+                  disabled={isUploadingStartPhoto}
+                  className={`w-full py-2.5 rounded-2xl border-2 border-dashed flex items-center justify-center space-x-2 text-xs font-black transition tap-active ${
+                    startPhotoUrl
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                      : 'border-[#E5DFD3] bg-[#F8F6F0] text-[#111827]'
+                  }`}
+                >
+                  {isUploadingStartPhoto ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>Compressing & Uploading...</span>
+                    </>
+                  ) : startPhotoUrl ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span>✓ Start Meter Photo Attached (Tap to retake)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-4 h-4 text-emerald-600" />
+                      <span>📸 Snap Starting Meter Photo</span>
+                    </>
+                  )}
+                </button>
+
+                {startPhotoUrl && (
+                  <div className="relative rounded-2xl overflow-hidden border border-emerald-300 h-24 w-full bg-black/5">
+                    <img
+                      src={startPhotoUrl}
+                      alt="Starting Odometer"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-1.5 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs">
+                      Start Meter Photo
+                    </span>
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center space-x-2 pt-1">
                 <button
@@ -379,6 +449,59 @@ export const DriverActiveDuty = ({ booking }) => {
                   />
                   <span className="px-3 text-xs font-black text-[#4B5563]">KM</span>
                 </div>
+              </div>
+
+              {/* Real Camera & Photo Capture for End Odometer */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                ref={endFileRef}
+                onChange={handleEndPhotoChange}
+                className="hidden"
+              />
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => endFileRef.current?.click()}
+                  disabled={isUploadingEndPhoto}
+                  className={`w-full py-2.5 rounded-2xl border-2 border-dashed flex items-center justify-center space-x-2 text-xs font-black transition tap-active ${
+                    endPhotoUrl
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                      : 'border-[#E5DFD3] bg-[#F8F6F0] text-[#111827]'
+                  }`}
+                >
+                  {isUploadingEndPhoto ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                      <span>Compressing & Uploading...</span>
+                    </>
+                  ) : endPhotoUrl ? (
+                    <>
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span>✓ End Meter Photo Attached (Tap to retake)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-4 h-4 text-emerald-600" />
+                      <span>📸 Snap Ending Meter Photo</span>
+                    </>
+                  )}
+                </button>
+
+                {endPhotoUrl && (
+                  <div className="relative rounded-2xl overflow-hidden border border-emerald-300 h-24 w-full bg-black/5">
+                    <img
+                      src={endPhotoUrl}
+                      alt="Ending Odometer"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-1.5 left-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs">
+                      End Meter Photo
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Meter Calculations Card */}

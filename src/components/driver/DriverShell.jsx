@@ -156,9 +156,9 @@ export const DriverShell = ({ children }) => {
         {children}
       </div>
 
-      {/* Driver Floating Bottom Navigation Dock */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-[440px] mx-auto px-5 pb-5 pt-2 pointer-events-none z-30">
-        <div className="frosted-dock rounded-full px-3 py-2 flex items-center justify-between pointer-events-auto shadow-dock border-2 border-emerald-500/20">
+      {/* Driver Floating Bottom Navigation Dock (Anchored inside phone-shell) */}
+      <div className="absolute bottom-0 left-0 right-0 w-full px-4 pb-4 pt-1 pointer-events-none z-30">
+        <div className="frosted-dock rounded-full px-3 py-2 flex items-center justify-between pointer-events-auto shadow-dock border-2 border-emerald-500/20 bg-white/95 backdrop-blur-lg">
           {/* Duty Cockpit Tab */}
           <button
             onClick={() => setDriverActiveTab('duty')}

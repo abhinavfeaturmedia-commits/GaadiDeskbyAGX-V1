@@ -10,6 +10,7 @@ export const mapBusinessToDb = (biz) => ({
   name: biz.name || '',
   owner_name: biz.ownerName || '',
   phone: biz.phone || '',
+  email: biz.email || '',
   whatsapp: biz.whatsapp || '',
   city: biz.city || '',
   state: biz.state || '',
@@ -31,6 +32,7 @@ export const mapBusinessFromDb = (row) => ({
   name: row.name,
   ownerName: row.owner_name,
   phone: row.phone,
+  email: row.email || '',
   whatsapp: row.whatsapp,
   city: row.city,
   state: row.state,
@@ -366,6 +368,64 @@ export const mapVehicleServiceFromDb = (row) => ({
   notes: row.notes
 });
 
+export const mapInvoiceToDb = (inv, businessId = 'biz-001') => ({
+  id: inv.id,
+  business_id: inv.businessId || businessId,
+  invoice_number: inv.invoiceNumber,
+  customer_id: inv.customerId || null,
+  customer_name: inv.customerName || '',
+  billing_period: inv.billingPeriod || '',
+  booking_ids: inv.bookingIds || [],
+  taxable_amount: Number(inv.taxableAmount) || 0,
+  gst_amount: Number(inv.gstAmount) || 0,
+  total_amount: Number(inv.totalAmount) || 0,
+  status: inv.status || 'Issued',
+  notes: inv.notes || '',
+  updated_at: new Date().toISOString()
+});
+
+export const mapInvoiceFromDb = (row) => ({
+  id: row.id,
+  businessId: row.business_id,
+  invoiceNumber: row.invoice_number,
+  customerId: row.customer_id,
+  customerName: row.customer_name,
+  billingPeriod: row.billing_period,
+  bookingIds: row.booking_ids || [],
+  taxableAmount: Number(row.taxable_amount) || 0,
+  gstAmount: Number(row.gst_amount) || 0,
+  totalAmount: Number(row.total_amount) || 0,
+  status: row.status,
+  notes: row.notes,
+  createdAt: row.created_at
+});
+
+export const mapDriverSubmissionToDb = (sub, businessId = 'biz-001') => ({
+  id: sub.id,
+  business_id: sub.businessId || businessId,
+  driver_id: sub.driverId || null,
+  driver_name: sub.driverName || 'Driver',
+  amount: Number(sub.amount) || 0,
+  payment_mode: sub.paymentMode || 'Cash',
+  notes: sub.notes || '',
+  status: sub.status || 'Verified',
+  date: sub.date || new Date().toISOString().split('T')[0],
+  updated_at: new Date().toISOString()
+});
+
+export const mapDriverSubmissionFromDb = (row) => ({
+  id: row.id,
+  businessId: row.business_id,
+  driverId: row.driver_id,
+  driverName: row.driver_name,
+  amount: Number(row.amount) || 0,
+  paymentMode: row.payment_mode,
+  notes: row.notes,
+  status: row.status,
+  date: row.date,
+  createdAt: row.created_at
+});
+
 // ============================================================================
 // SUPABASE CRUD METHODS
 // ============================================================================
@@ -382,7 +442,9 @@ export const supabaseApi = {
         rcRes,
         bkRes,
         expRes,
-        txRes
+        txRes,
+        invRes,
+        subRes
       ] = await Promise.all([
         supabase.from('businesses').select('*').eq('id', businessId).maybeSingle(),
         supabase.from('vehicles').select('*').eq('business_id', businessId).order('created_at', { ascending: true }),
@@ -391,7 +453,9 @@ export const supabaseApi = {
         supabase.from('rate_cards').select('*').eq('business_id', businessId).order('created_at', { ascending: true }),
         supabase.from('bookings').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
         supabase.from('expenses').select('*').eq('business_id', businessId).order('date', { ascending: false }),
-        supabase.from('transactions').select('*').eq('business_id', businessId).order('created_at', { ascending: false })
+        supabase.from('transactions').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
+        supabase.from('invoices').select('*').eq('business_id', businessId).order('created_at', { ascending: false }),
+        supabase.from('driver_submissions').select('*').eq('business_id', businessId).order('created_at', { ascending: false })
       ]);
 
       return {
@@ -403,6 +467,8 @@ export const supabaseApi = {
         bookings: (bkRes.data || []).map(mapBookingFromDb),
         expenses: (expRes.data || []).map(mapExpenseFromDb),
         transactions: (txRes.data || []).map(mapTransactionFromDb),
+        invoices: (invRes.data || []).map(mapInvoiceFromDb),
+        driverSubmissions: (subRes.data || []).map(mapDriverSubmissionFromDb),
         isLoaded: true
       };
     } catch (err) {
@@ -611,5 +677,91 @@ export const supabaseApi = {
     const { error } = await supabase.from('vehicle_services').delete().eq('id', serviceId);
     if (error) throw error;
     return true;
+  },
+
+  // Invoice mutations
+  async saveInvoice(invoice, businessId = 'biz-001') {
+    const dbPayload = mapInvoiceToDb(invoice, businessId);
+    const { data, error } = await supabase.from('invoices').upsert(dbPayload).select().single();
+    if (error) throw error;
+    return mapInvoiceFromDb(data);
+  },
+
+  async fetchInvoices(businessId = 'biz-001') {
+    const { data, error } = await supabase.from('invoices').select('*').eq('business_id', businessId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(mapInvoiceFromDb);
+  },
+
+  // Driver Cash Submission mutations
+  async saveDriverSubmission(submission, businessId = 'biz-001') {
+    const dbPayload = mapDriverSubmissionToDb(submission, businessId);
+    const { data, error } = await supabase.from('driver_submissions').upsert(dbPayload).select().single();
+    if (error) throw error;
+    return mapDriverSubmissionFromDb(data);
+  },
+
+  async fetchDriverSubmissions(businessId = 'biz-001') {
+    const { data, error } = await supabase.from('driver_submissions').select('*').eq('business_id', businessId).order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(mapDriverSubmissionFromDb);
+  },
+
+  // Lookup profile by email or phone (auto-detect driver vs owner)
+  async findProfileByPhoneOrEmail(identifier) {
+    if (!identifier) return null;
+    const cleanId = String(identifier).trim();
+    const isEmail = cleanId.includes('@');
+
+    try {
+      let query = supabase.from('profiles').select('*');
+      if (isEmail) {
+        query = query.ilike('email', cleanId.toLowerCase());
+      } else {
+        const pureDigits = cleanId.replace(/\D/g, '').slice(-10);
+        query = query.like('phone', `%${pureDigits}%`);
+      }
+
+      const { data, error } = await query.limit(1);
+      if (!error && data && data.length > 0) {
+        const profile = data[0];
+        return {
+          id: profile.id,
+          role: profile.role || 'owner',
+          name: profile.name,
+          phone: profile.phone,
+          email: profile.email,
+          businessId: profile.business_id
+        };
+      }
+
+      // Check businesses table directly
+      let bizQuery = supabase.from('businesses').select('*');
+      if (isEmail) {
+        bizQuery = bizQuery.ilike('email', cleanId.toLowerCase());
+      } else {
+        const pureDigits = cleanId.replace(/\D/g, '').slice(-10);
+        bizQuery = bizQuery.like('phone', `%${pureDigits}%`);
+      }
+
+      const { data: bizData } = await bizQuery.limit(1);
+      if (bizData && bizData.length > 0) {
+        const b = mapBusinessFromDb(bizData[0]);
+        return {
+          role: 'owner',
+          name: b.ownerName || b.name,
+          phone: b.phone,
+          email: b.email,
+          businessId: b.id,
+          business: b
+        };
+      }
+
+      return null;
+    } catch (err) {
+      console.warn('[findProfileByPhoneOrEmail Warning]:', err);
+      return null;
+    }
   }
 };
+

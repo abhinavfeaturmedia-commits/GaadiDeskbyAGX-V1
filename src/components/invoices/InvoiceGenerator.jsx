@@ -19,10 +19,14 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
 
   if (!booking) return null;
 
-  const isGst = booking.gstEnabled !== false && business.gstin;
-  const taxableAmount = booking.taxableAmount || (booking.totalFare / 1.05);
-  const cgstAmount = isGst ? Math.round(taxableAmount * 0.025) : 0;
-  const sgstAmount = isGst ? Math.round(taxableAmount * 0.025) : 0;
+  const isGst = booking.gstEnabled !== false && Boolean(business.gstin);
+  const gstRate = Number(booking.gstPercent || 5);
+  const halfGstRate = gstRate / 2;
+  const taxableAmount = booking.taxableAmount !== undefined && booking.taxableAmount !== null
+    ? Number(booking.taxableAmount)
+    : Math.round((Number(booking.totalFare || 0) - Number(booking.tollParking || 0)) / (1 + (isGst ? gstRate / 100 : 0)));
+  const cgstAmount = isGst ? Math.round(taxableAmount * (halfGstRate / 100)) : 0;
+  const sgstAmount = isGst ? Math.round(taxableAmount * (halfGstRate / 100)) : 0;
   const totalAmount = booking.totalFare;
 
   const handlePrint = () => {
@@ -31,17 +35,20 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
 
   const handleShareWhatsApp = () => {
     const text = `*TAX INVOICE - ${business.name}*\n` +
-      `Invoice No: ${booking.invoiceNumber || 'GD/2026-27/0101'}\n` +
+      `Invoice No: ${booking.invoiceNumber || booking.id}\n` +
       `Customer: ${booking.customerName}\n` +
       `Vehicle: ${booking.vehiclePlate}\n` +
       `Trip: ${booking.pickupLocation} ➔ ${booking.dropLocation}\n` +
       `Dates: ${new Date(booking.startDateTime).toLocaleDateString()} to ${new Date(booking.endDateTime).toLocaleDateString()}\n` +
       `Taxable Value: ${formatCurrency(taxableAmount)}\n` +
-      (isGst ? `CGST (2.5%): ${formatCurrency(cgstAmount)}\nSGST (2.5%): ${formatCurrency(sgstAmount)}\n` : '') +
+      (isGst ? `CGST (${halfGstRate}%): ${formatCurrency(cgstAmount)}\nSGST (${halfGstRate}%): ${formatCurrency(sgstAmount)}\n` : '') +
+      (booking.tollParking > 0 ? `Toll & Parking: ${formatCurrency(booking.tollParking)}\n` : '') +
       `*Total Amount: ${formatCurrency(totalAmount)}*\n` +
-      `Advance Paid: ${formatCurrency(booking.advancePaid)}\n` +
-      `*Balance Due: ${formatCurrency(booking.balancePending)}*\n\n` +
-      `Thank you for traveling with ${business.name}!`;
+      `Advance Paid: ${formatCurrency(booking.advancePaid || 0)}\n` +
+      `*Balance Due: ${formatCurrency(booking.balancePending || 0)}*\n\n` +
+      `Bank: ${business.bankName || 'HDFC Bank'} | A/C: ${business.bankAccount || '50200012345678'} | IFSC: ${business.bankIfsc || 'HDFC0001234'}\n` +
+      `UPI: ${business.upiId || 'office@upi'}\n\n` +
+      `Thank you for traveling with ${business.name || 'us'}!`;
 
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
@@ -149,7 +156,29 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
                   <td className="p-2 text-right font-bold">{formatCurrency(booking.baseFare || taxableAmount)}</td>
                 </tr>
 
-                {booking.driverBata > 0 && (
+                {Number(booking.extraKmCharges) > 0 && (
+                  <tr>
+                    <td className="p-2">
+                      <p className="font-bold">Extra Distance Run</p>
+                      <p className="text-[10px] text-gray-500">Beyond package allowance</p>
+                    </td>
+                    <td className="p-2 font-mono text-[10px]">9966</td>
+                    <td className="p-2 text-right">{formatCurrency(booking.extraKmCharges)}</td>
+                  </tr>
+                )}
+
+                {Number(booking.extraHoursCharges) > 0 && (
+                  <tr>
+                    <td className="p-2">
+                      <p className="font-bold">Extra Hours / Overtime</p>
+                      <p className="text-[10px] text-gray-500">{booking.extraHours} extra duty hours</p>
+                    </td>
+                    <td className="p-2 font-mono text-[10px]">9966</td>
+                    <td className="p-2 text-right">{formatCurrency(booking.extraHoursCharges)}</td>
+                  </tr>
+                )}
+
+                {Number(booking.driverBata) > 0 && (
                   <tr>
                     <td className="p-2">Driver Bata / Allowance</td>
                     <td className="p-2 font-mono text-[10px]">9966</td>
@@ -157,7 +186,7 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
                   </tr>
                 )}
 
-                {booking.nightHalt > 0 && (
+                {Number(booking.nightHalt) > 0 && (
                   <tr>
                     <td className="p-2">Night Halt Charge</td>
                     <td className="p-2 font-mono text-[10px]">9966</td>
@@ -165,11 +194,19 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
                   </tr>
                 )}
 
-                {booking.tollParking > 0 && (
+                {Number(booking.tollParking) > 0 && (
                   <tr>
                     <td className="p-2">Toll & Parking Reimbursable</td>
                     <td className="p-2 font-mono text-[10px]">9966</td>
                     <td className="p-2 text-right">{formatCurrency(booking.tollParking)}</td>
+                  </tr>
+                )}
+
+                {Number(booking.discount) > 0 && (
+                  <tr className="text-green-700">
+                    <td className="p-2">Special Discount</td>
+                    <td className="p-2 font-mono text-[10px]">9966</td>
+                    <td className="p-2 text-right">-{formatCurrency(booking.discount)}</td>
                   </tr>
                 )}
               </tbody>
@@ -186,11 +223,11 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
             {isGst && (
               <>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-gray-600">CGST @ 2.5%:</span>
+                  <span className="text-gray-600">CGST @ {halfGstRate}%:</span>
                   <span className="font-bold">{formatCurrency(cgstAmount)}</span>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-gray-600">SGST @ 2.5%:</span>
+                  <span className="text-gray-600">SGST @ {halfGstRate}%:</span>
                   <span className="font-bold">{formatCurrency(sgstAmount)}</span>
                 </div>
               </>
@@ -203,12 +240,12 @@ export const InvoiceGenerator = ({ booking, onClose }) => {
 
             <div className="flex justify-between text-xs font-bold text-gray-700">
               <span>Advance Paid:</span>
-              <span className="text-green-700">{formatCurrency(booking.advancePaid)}</span>
+              <span className="text-green-700">{formatCurrency(booking.advancePaid || 0)}</span>
             </div>
 
             <div className="flex justify-between text-xs font-extrabold text-red-700 pt-1 border-t border-dashed border-gray-300">
               <span>Balance Payable:</span>
-              <span>{formatCurrency(booking.balancePending)}</span>
+              <span>{formatCurrency(booking.balancePending || 0)}</span>
             </div>
           </div>
 

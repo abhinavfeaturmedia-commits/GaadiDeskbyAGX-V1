@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { initiateMembershipPayment } from '../../services/paymentService';
 import {
   X,
   Check,
@@ -9,11 +10,12 @@ import {
   Sparkles,
   Tag,
   CreditCard,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 
 export const MembershipPlans = ({ onClose }) => {
-  const { business, updateBusiness, formatCurrency, t } = useApp();
+  const { business, updateBusiness, formatCurrency, t, recordTransaction } = useApp();
 
   const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'yearly'
   const [couponCode, setCouponCode] = useState('');
@@ -80,17 +82,51 @@ export const MembershipPlans = ({ onClose }) => {
   };
 
   const handleUpgrade = (plan) => {
+    const rawPrice = billingCycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice;
+    const finalAmount = Math.round(rawPrice * (1 - discountPercent / 100));
+
     setIsProcessing(true);
-    setTimeout(() => {
-      updateBusiness({
-        membershipPlan: plan.id,
-        vehicleLimit: plan.vehicles,
-        staffLimit: plan.staff,
-        membershipExpires: '2027-08-30'
-      });
-      setIsProcessing(false);
-      setSuccessPlan(plan);
-    }, 1200);
+    initiateMembershipPayment({
+      plan,
+      billingCycle,
+      finalAmount,
+      business,
+      onSuccess: (paymentData) => {
+        const expiryDate = new Date();
+        if (billingCycle === 'yearly') {
+          expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+        } else {
+          expiryDate.setMonth(expiryDate.getMonth() + 1);
+        }
+
+        updateBusiness({
+          membershipPlan: plan.id,
+          membershipStatus: 'Active Pro',
+          vehicleLimit: plan.vehicles,
+          staffLimit: plan.staff,
+          membershipExpires: expiryDate.toISOString().split('T')[0]
+        });
+
+        // Record SaaS membership payment in business ledger
+        if (recordTransaction) {
+          recordTransaction({
+            type: 'Expense',
+            category: 'Software & Membership',
+            amount: finalAmount,
+            paymentMode: 'Online Gateway',
+            notes: `GaadiDesk ${plan.name} (${billingCycle}) - Ref: ${paymentData.paymentId}`,
+            date: new Date().toISOString().split('T')[0]
+          });
+        }
+
+        setIsProcessing(false);
+        setSuccessPlan(plan);
+      },
+      onFailure: (err) => {
+        setIsProcessing(false);
+        console.warn('[Membership Payment Cancelled/Failed]:', err);
+      }
+    });
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   X,
@@ -36,9 +36,14 @@ export const NewBookingWizard = ({ onClose }) => {
     setWhatsAppData,
     newBookingPrefill,
     setNewBookingPrefill,
+    editingBooking,
+    setEditingBooking,
     parseWhatsAppBookingText,
     setInspectionModalBooking
   } = useApp();
+
+  const isEditMode = Boolean(editingBooking || newBookingPrefill?.id);
+  const isInitialMountRef = useRef(true);
 
   const [step, setStep] = useState(1);
   const [showParserDrawer, setShowParserDrawer] = useState(false);
@@ -53,46 +58,53 @@ export const NewBookingWizard = ({ onClose }) => {
     { day: 3, from: 'Mahabaleshwar', to: 'Pune', notes: 'Evening return drop' }
   ]);
 
-  // Form State with prefill support
-  const [formData, setFormData] = useState({
-    tripType: newBookingPrefill?.tripType || 'Outstation',
-    isRoundTrip: true,
-    pickupLocation: newBookingPrefill?.pickupLocation || '',
-    dropLocation: newBookingPrefill?.dropLocation || '',
-    startDateTime: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
-    endDateTime: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16),
-    customerName: newBookingPrefill?.customerName || '',
-    customerPhone: newBookingPrefill?.customerPhone || '',
-    vehicleId: newBookingPrefill?.vehicleId || '',
-    driverId: '',
-    estimatedKm: 300,
-    ratePerKm: 14,
-    baseFare: 4200,
-    driverBata: 400,
-    nightHalt: 300,
-    tollParking: 350,
-    discount: 0,
-    gstEnabled: true,
-    gstPercent: 5,
-    advancePaid: 1500,
-    advanceMode: 'UPI',
-    notes: '',
-    securityDeposit: 5000,
-    fuelPolicy: 'Same to Same',
-    customerAadhaarOrDl: ''
-  });
+  // Form State with prefill/edit support
+  const [formData, setFormData] = useState(() => ({
+    id: editingBooking?.id || newBookingPrefill?.id || undefined,
+    tripType: editingBooking?.tripType || newBookingPrefill?.tripType || 'Outstation',
+    isRoundTrip: editingBooking?.isRoundTrip ?? newBookingPrefill?.isRoundTrip ?? true,
+    pickupLocation: editingBooking?.pickupLocation || newBookingPrefill?.pickupLocation || '',
+    dropLocation: editingBooking?.dropLocation || newBookingPrefill?.dropLocation || '',
+    startDateTime: editingBooking?.startDateTime || newBookingPrefill?.startDateTime || new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+    endDateTime: editingBooking?.endDateTime || newBookingPrefill?.endDateTime || new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16),
+    customerName: editingBooking?.customerName || newBookingPrefill?.customerName || '',
+    customerPhone: editingBooking?.customerPhone || newBookingPrefill?.customerPhone || '',
+    vehicleId: editingBooking?.vehicleId || newBookingPrefill?.vehicleId || '',
+    driverId: editingBooking?.driverId || newBookingPrefill?.driverId || '',
+    estimatedKm: editingBooking?.estimatedKm || newBookingPrefill?.estimatedKm || 300,
+    ratePerKm: editingBooking?.ratePerKm || newBookingPrefill?.ratePerKm || 14,
+    baseFare: editingBooking?.baseFare || newBookingPrefill?.baseFare || 4200,
+    driverBata: editingBooking?.driverBata !== undefined ? editingBooking.driverBata : (newBookingPrefill?.driverBata !== undefined ? newBookingPrefill.driverBata : 400),
+    nightHalt: editingBooking?.nightHalt !== undefined ? editingBooking.nightHalt : (newBookingPrefill?.nightHalt !== undefined ? newBookingPrefill.nightHalt : 300),
+    tollParking: editingBooking?.tollParking !== undefined ? editingBooking.tollParking : (newBookingPrefill?.tollParking !== undefined ? newBookingPrefill.tollParking : 350),
+    discount: editingBooking?.discount || newBookingPrefill?.discount || 0,
+    gstEnabled: editingBooking?.gstEnabled ?? newBookingPrefill?.gstEnabled ?? true,
+    gstPercent: editingBooking?.gstPercent || newBookingPrefill?.gstPercent || 5,
+    advancePaid: editingBooking?.advancePaid !== undefined ? editingBooking.advancePaid : (newBookingPrefill?.advancePaid !== undefined ? newBookingPrefill.advancePaid : 1500),
+    advanceMode: editingBooking?.advanceMode || newBookingPrefill?.advanceMode || 'UPI',
+    notes: editingBooking?.notes || newBookingPrefill?.notes || '',
+    securityDeposit: editingBooking?.securityDeposit || newBookingPrefill?.securityDeposit || 5000,
+    fuelPolicy: editingBooking?.fuelPolicy || newBookingPrefill?.fuelPolicy || 'Same to Same',
+    customerAadhaarOrDl: editingBooking?.customerAadhaarOrDl || newBookingPrefill?.customerAadhaarOrDl || ''
+  }));
 
   const [clashError, setClashError] = useState(null);
 
-  // Clear prefill on unmount
+  // Clear prefill/edit mode on unmount
   useEffect(() => {
     return () => {
       if (newBookingPrefill) setNewBookingPrefill(null);
+      if (editingBooking) setEditingBooking(null);
     };
   }, []);
 
   // Auto-fill from rate cards when trip type OR vehicle changes
   useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
+
     const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
     const category = selectedVehicle?.category || 'Sedan';
 
@@ -252,13 +264,19 @@ export const NewBookingWizard = ({ onClose }) => {
       gstAmount,
       totalFare,
       balancePending,
-      status: formData.driverId ? 'Driver Assigned' : 'Confirmed'
+      status: formData.status || (formData.driverId ? 'Driver Assigned' : 'Confirmed')
     };
 
     const saved = saveBooking(newBookingData);
-    onClose();
+    handleClose();
     // Open formatted WhatsApp modal
     setWhatsAppData({ type: 'booking', booking: saved });
+  };
+
+  const handleClose = () => {
+    if (setNewBookingPrefill) setNewBookingPrefill(null);
+    if (setEditingBooking) setEditingBooking(null);
+    onClose();
   };
 
   const tripTypes = [
@@ -279,17 +297,26 @@ export const NewBookingWizard = ({ onClose }) => {
               {step}/4
             </div>
             <div>
-              <h3 className="text-sm font-black text-[#111827]">
-                {step === 1 && t('step1Title')}
-                {step === 2 && t('step2Title')}
-                {step === 3 && t('step3Title')}
-                {step === 4 && t('step4Title')}
-              </h3>
-              <p className="text-[11px] text-[#4B5563] font-semibold">4-Step Fleet Dispatch Wizard</p>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-black text-[#111827]">
+                  {step === 1 && t('step1Title')}
+                  {step === 2 && t('step2Title')}
+                  {step === 3 && t('step3Title')}
+                  {step === 4 && t('step4Title')}
+                </h3>
+                {isEditMode && (
+                  <span className="text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.2 rounded-full">
+                    Edit {formData.id}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-[#4B5563] font-semibold">
+                {isEditMode ? 'Modify Trip Details' : '4-Step Fleet Dispatch Wizard'}
+              </p>
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[#111827] hover:bg-gray-200 tap-active"
           >
             <X className="w-4 h-4" />
@@ -920,7 +947,7 @@ export const NewBookingWizard = ({ onClose }) => {
               className="px-6 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 shadow-md tap-active"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Confirm & WhatsApp Slip</span>
+              <span>{isEditMode ? 'Update & WhatsApp Slip' : 'Confirm & WhatsApp Slip'}</span>
             </button>
           )}
         </div>

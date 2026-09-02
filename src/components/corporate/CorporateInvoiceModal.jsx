@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const CorporateInvoiceModal = ({ customer, onClose }) => {
-  const { business, bookings, formatCurrency, recordTransaction } = useApp();
+  const { business, bookings, formatCurrency, saveCorporateInvoice, invoices } = useApp();
   const invoiceRef = useRef();
 
   // Find all completed bookings for this customer
@@ -30,11 +30,30 @@ export const CorporateInvoiceModal = ({ customer, onClose }) => {
     customerBookings.map(b => b.id)
   );
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [billingPeriod, setBillingPeriod] = useState('1 Aug 2026 – 31 Aug 2026');
-  const [invoiceNumber, setInvoiceNumber] = useState(`GD/CORP/2026-27/${String(Math.floor(Math.random() * 900 + 100))}`);
-  const [isSaved, setIsSaved] = useState(false);
 
   const selectedTrips = customerBookings.filter(b => selectedBookingIds.includes(b.id));
+
+  // Dynamic calculation of billing period based on selected trips
+  const calcBillingPeriod = () => {
+    if (!selectedTrips.length) return new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+    const dates = selectedTrips
+      .map(t => new Date(t.startDateTime || t.createdAt))
+      .filter(d => !isNaN(d.getTime()))
+      .sort((a, b) => a - b);
+    if (!dates.length) return 'Current Billing Period';
+    const fmt = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `${fmt(dates[0])} – ${fmt(dates[dates.length - 1])}`;
+  };
+
+  const billingPeriod = calcBillingPeriod();
+
+  // Sequential GST-compliant corporate invoice numbering
+  const [invoiceNumber] = useState(() => {
+    const seq = String((invoices || []).length + 101).padStart(4, '0');
+    return `GD/CORP/2026-27/${seq}`;
+  });
+
+  const [isSaved, setIsSaved] = useState(false);
 
   // Computations with Zero Toll Double-Counting
   const totalTaxable = selectedTrips.reduce((sum, b) => {
@@ -65,11 +84,34 @@ export const CorporateInvoiceModal = ({ customer, onClose }) => {
     }
   };
 
+  const handleSaveInvoiceRecord = () => {
+    if (selectedBookingIds.length === 0) {
+      alert("Please select at least one trip to generate the corporate invoice.");
+      return null;
+    }
+    const saved = saveCorporateInvoice({
+      invoiceNumber,
+      customerId: customer?.id,
+      customerName: customer?.name,
+      billingPeriod,
+      bookingIds: selectedBookingIds,
+      taxableAmount: totalTaxable,
+      gstAmount: cgstAmount + sgstAmount,
+      totalAmount: grandTotal,
+      status: 'Issued',
+      notes: `Consolidated B2B tax invoice for ${customer?.name}`
+    });
+    setIsSaved(true);
+    return saved;
+  };
+
   const handlePrint = () => {
+    if (!isSaved) handleSaveInvoiceRecord();
     window.print();
   };
 
   const handleShareWhatsApp = () => {
+    if (!isSaved) handleSaveInvoiceRecord();
     let text = `*CONSOLIDATED CORPORATE TAX INVOICE*\n`;
     text += `*${business.name}*\n`;
     text += `Invoice No: ${invoiceNumber}\n`;
@@ -85,8 +127,8 @@ export const CorporateInvoiceModal = ({ customer, onClose }) => {
     text += `Tolls & Parking: ${formatCurrency(totalTolls)}\n`;
     text += `*GRAND TOTAL: ${formatCurrency(grandTotal)}*\n\n`;
     text += `Please process NEFT/RTGS payment to:\n`;
-    text += `Bank: HDFC Bank | A/C: 50200012345678 | IFSC: HDFC0001234\n`;
-    text += `UPI: ${business.upiId || 'ramesh.tours@okhdfcbank'}\n\n`;
+    text += `Bank: ${business.bankName || 'Bank of Maharashtra'} | A/C: ${business.bankAccount || 'Current A/C'} | IFSC: ${business.bankIfsc || 'MAHB0000123'}\n`;
+    text += `UPI: ${business.upiId || 'office@upi'}\n\n`;
     text += `Thank you for your business!`;
 
     const cleanPhone = (customer.phone || '').replace(/\D/g, '');
@@ -233,8 +275,8 @@ export const CorporateInvoiceModal = ({ customer, onClose }) => {
             <div className="border-t-2 border-gray-900 pt-2 flex justify-between items-start">
               <div className="text-[9px] text-gray-500 space-y-0.5">
                 <p>HSN / SAC Code: 9966 (Passenger Transport)</p>
-                <p>Bank: HDFC Bank | A/C: 50200012345678</p>
-                <p>IFSC: HDFC0001234 | UPI: {business.upiId || 'ramesh.tours@okhdfcbank'}</p>
+                <p>Bank: {business.bankName || 'Bank'} | A/C: {business.bankAccount || 'Current A/C'}</p>
+                <p>IFSC: {business.bankIfsc || 'MAHB0000123'} | UPI: {business.upiId || 'office@upi'}</p>
               </div>
 
               <div className="w-48 text-right text-[11px] space-y-1">
@@ -271,20 +313,35 @@ export const CorporateInvoiceModal = ({ customer, onClose }) => {
 
         {/* Action Controls */}
         <div className="p-4 border-t border-[#E5DFD3] bg-[#F8F6F0] flex items-center justify-between print:hidden">
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2.5 rounded-2xl bg-white border border-[#E5DFD3] text-[#111827] text-xs font-black flex items-center gap-1.5 hover:bg-gray-100 tap-active shadow-xs"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Print Invoice</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="px-3.5 py-2 rounded-2xl bg-white border border-[#E5DFD3] text-[#111827] text-xs font-black flex items-center gap-1.5 hover:bg-gray-100 tap-active shadow-xs"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print</span>
+            </button>
+
+            <button
+              onClick={handleSaveInvoiceRecord}
+              disabled={isSaved}
+              className={`px-3.5 py-2 rounded-2xl text-xs font-black flex items-center gap-1.5 tap-active shadow-xs ${
+                isSaved
+                  ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                  : 'bg-[#111827] text-white hover:bg-black'
+              }`}
+            >
+              <Check className="w-3.5 h-3.5 text-[#D4F05B]" />
+              <span>{isSaved ? 'Saved to DB' : 'Save Invoice'}</span>
+            </button>
+          </div>
 
           <button
             onClick={handleShareWhatsApp}
-            className="px-4 py-2.5 rounded-2xl bg-[#25D366] text-white text-xs font-black flex items-center gap-1.5 hover:bg-[#20bd5a] tap-active shadow-xs"
+            className="px-4 py-2 rounded-2xl bg-[#25D366] text-white text-xs font-black flex items-center gap-1.5 hover:bg-[#20bd5a] tap-active shadow-xs"
           >
             <Share2 className="w-3.5 h-3.5" />
-            <span>Share on WhatsApp</span>
+            <span>Share WhatsApp</span>
           </button>
         </div>
       </div>

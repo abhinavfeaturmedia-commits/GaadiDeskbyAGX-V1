@@ -279,11 +279,6 @@ export const HomeDashboard = () => {
               key={cat.id}
               onClick={() => {
                 setActivePill(cat.id);
-                if (cat.id === 'bookings') setActiveTab('trips');
-                else if (cat.id === 'fleet') setActiveTab('fleet');
-                else if (cat.id === 'money') setActiveTab('money');
-                else if (cat.id === 'papers') openMoreSubView('papers');
-                else if (cat.id === 'customers') openMoreSubView('crm');
               }}
               className={`px-4 py-1.5 rounded-full text-xs font-black transition-all whitespace-nowrap tap-active ${
                 isActive
@@ -571,7 +566,7 @@ export const HomeDashboard = () => {
       </div>
 
       {/* 10. Active Trip Spotlight (Hero Player Card - matching Screen 2 in app_ui_ux.jpg) */}
-      {ongoingTrip && (
+      {ongoingTrip ? (
         <div
           onClick={() => setSelectedTripDetailBooking(ongoingTrip)}
           className="bg-white rounded-3xl p-5 shadow-soft border border-[#EFEAE2]/80 space-y-4 stagger-3 cursor-pointer transition-all tap-active group"
@@ -689,6 +684,25 @@ export const HomeDashboard = () => {
               <span>Bill</span>
             </button>
           </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-3xl p-6 shadow-soft border border-[#EFEAE2]/80 text-center space-y-3 stagger-3">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mx-auto text-xl shadow-xs">
+            🚖
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-[#111827]">No Active Trips</h4>
+            <p className="text-xs text-[#8A8782] font-semibold mt-0.5 max-w-xs mx-auto">
+              Create your first booking to track driver dispatch, live duty, and payment settlements.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsNewBookingOpen(true)}
+            className="px-5 py-2.5 rounded-full bg-[#111827] hover:bg-black text-white text-xs font-black shadow-xs tap-active inline-flex items-center space-x-1.5"
+          >
+            <PlusCircle className="w-3.5 h-3.5 text-[#D4F05B]" />
+            <span>+ Create First Booking</span>
+          </button>
         </div>
       )}
     </div>

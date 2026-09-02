@@ -110,7 +110,7 @@ export const MobileShell = ({ children }) => {
               <span className="text-amber-500 text-xs">{greeting.icon}</span>
             </div>
             <h2 className="text-sm font-extrabold text-[#1E232A] leading-tight truncate max-w-[160px]">
-              {business.ownerName || 'Ramesh Gaikwad'}
+              {business.ownerName || business.name || 'Fleet Owner'}
             </h2>
           </div>
         </div>
@@ -175,6 +175,19 @@ export const MobileShell = ({ children }) => {
               </span>
             )}
           </button>
+
+          {/* Quick Menu Shortcut Button (Header) */}
+          <button
+            onClick={() => setActiveTab('more')}
+            className={`w-9 h-9 rounded-full border shadow-soft flex items-center justify-center transition-all tap-active ${
+              activeTab === 'more'
+                ? 'bg-[#111827] text-[#DDF262] border-[#111827]'
+                : 'bg-white border-card-border text-gray-800 hover:bg-gray-50'
+            }`}
+            title={t('navMore') || 'Menu'}
+          >
+            <Menu className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -186,11 +199,9 @@ export const MobileShell = ({ children }) => {
         {children}
       </div>
 
-      {/* Floating Bottom Navigation Dock (Hidden smoothly whenever any modal is open) */}
-      <div className={`fixed bottom-0 left-0 right-0 max-w-[440px] mx-auto px-5 pb-5 pt-2 pointer-events-none z-30 transition-all duration-300 ${
-        isAnyModalOpen ? 'translate-y-28 opacity-0' : 'translate-y-0 opacity-100'
-      }`}>
-        <div className="frosted-dock rounded-full px-2.5 py-1.5 flex items-center justify-between pointer-events-auto shadow-dock border border-white/80">
+      {/* Floating Bottom Navigation Dock (Always firmly anchored inside phone-shell) */}
+      <div className="absolute bottom-0 left-0 right-0 w-full px-4 pb-4 pt-1 pointer-events-none z-30">
+        <div className="frosted-dock rounded-full px-2.5 py-1.5 flex items-center justify-between pointer-events-auto shadow-dock border border-white/80 bg-white/95 backdrop-blur-lg">
           {/* Home Tab */}
           <button
             onClick={() => setActiveTab('home')}

@@ -58,31 +58,31 @@ export const WhatsAppModal = ({ data, onClose }) => {
     }
 
     if (type === 'reminder') {
-      const balance = c.pendingBalance || b.balancePending || 2400;
+      const balance = c.pendingBalance || b.balancePending || 0;
+      const bizName = (business.name || 'Fleet Office').toUpperCase();
       if (reminderStage === 1) {
         // Stage 1: Gentle Friendly Check-in
-        return `*💳 GENTLE PAYMENT REMINDER - ${business.name.toUpperCase()}*\n\n` +
+        return `*💳 GENTLE PAYMENT REMINDER - ${bizName}*\n\n` +
           `Hello *${targetName}*,\n\n` +
           `Hope you had a comfortable journey with us! This is a gentle reminder regarding your pending trip balance of *${formatCurrency(balance)}*.\n\n` +
-          `⚡ *UPI ID:* ${business.upiId || 'ramesh.tours@okhdfcbank'}\n` +
+          `⚡ *UPI ID:* ${business.upiId || 'office@upi'}\n` +
           `Kindly clear the balance at your earliest convenience. Thank you!`;
       } else if (reminderStage === 2) {
         // Stage 2: Due Today
-        return `*📢 PAYMENT DUE TODAY - ${business.name.toUpperCase()}*\n\n` +
+        return `*📢 PAYMENT DUE TODAY - ${bizName}*\n\n` +
           `Dear *${targetName}*,\n\n` +
           `Your invoice balance of *${formatCurrency(balance)}* is scheduled for clearance today.\n\n` +
-          `⚡ *UPI Payment:* ${business.upiId || 'ramesh.tours@okhdfcbank'}\n` +
-          `🏦 *Bank A/C:* HDFC Bank | A/C: 50200012345678 | IFSC: HDFC0001234\n\n` +
+          `⚡ *UPI Payment:* ${business.upiId || 'office@upi'}\n\n` +
           `Please share a screenshot once payment is completed.\n` +
-          `📞 *Accounts Dept:* ${business.phone}`;
+          `📞 *Office:* ${business.phone || 'Contact Office'}`;
       } else {
         // Stage 3: Overdue Statement of Account
-        return `*⚠️ OVERDUE STATEMENT OF ACCOUNT - ${business.name.toUpperCase()}*\n\n` +
+        return `*⚠️ OVERDUE STATEMENT OF ACCOUNT - ${bizName}*\n\n` +
           `Dear *${targetName}*,\n\n` +
           `This is a formal notice regarding your overdue balance of *${formatCurrency(balance)}* pending across past trips.\n\n` +
-          `Kindly settle this amount immediately via UPI (${business.upiId || 'ramesh.tours@okhdfcbank'}) or NEFT.\n` +
+          `Kindly settle this amount immediately via UPI (${business.upiId || 'office@upi'}).\n` +
           `If already paid, please ignore this message.\n\n` +
-          `_Office Accounts, ${business.name}_ • ${business.phone}`;
+          `_Office Accounts, ${business.name || 'Fleet Office'}_ • ${business.phone || ''}`;
       }
     }
 

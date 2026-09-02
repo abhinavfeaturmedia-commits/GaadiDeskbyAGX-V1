@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { uploadMediaToCloud } from '../../services/storageService';
 import {
   X,
   ShieldCheck,
@@ -9,7 +10,9 @@ import {
   Fuel,
   Wrench,
   Car,
-  FileText
+  FileText,
+  Loader2,
+  Trash2
 } from 'lucide-react';
 
 export const VehicleInspectionModal = ({ booking, onSave, onClose }) => {
@@ -27,8 +30,33 @@ export const VehicleInspectionModal = ({ booking, onSave, onClose }) => {
     fuelLevel: existingInspection.fuelLevel || '100% Full', // 25% | 50% | 75% | 100% Full
     odometerStart: existingInspection.odometerStart || vehicle.odometer || 64200,
     notes: existingInspection.notes || '',
+    photos: existingInspection.photos || [],
     inspectedAt: new Date().toISOString()
   });
+
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const photoInputRef = useRef(null);
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingPhoto(true);
+    const res = await uploadMediaToCloud(file, 'inspection-photos', 'inspections');
+    if (res.url) {
+      setInspection(prev => ({
+        ...prev,
+        photos: [...(prev.photos || []), res.url]
+      }));
+    }
+    setIsUploadingPhoto(false);
+  };
+
+  const handleRemovePhoto = (index) => {
+    setInspection(prev => ({
+      ...prev,
+      photos: (prev.photos || []).filter((_, i) => i !== index)
+    }));
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -159,6 +187,63 @@ export const VehicleInspectionModal = ({ booking, onSave, onClose }) => {
                 {inspection.stepneyAndJack ? 'Present ✅' : 'Missing ❌'}
               </button>
             </div>
+          </div>
+
+          {/* Vehicle Condition Photos */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-black text-[#4B5563] uppercase tracking-wider block">
+                Condition Photos ({inspection.photos?.length || 0})
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                ref={photoInputRef}
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={isUploadingPhoto}
+                className="px-2.5 py-1 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black flex items-center gap-1 tap-active"
+              >
+                {isUploadingPhoto ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera className="w-3 h-3" />
+                    <span>+ Add Photo</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Photos Gallery */}
+            {inspection.photos && inspection.photos.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {inspection.photos.map((url, idx) => (
+                  <div key={idx} className="relative group rounded-xl overflow-hidden border border-[#E5DFD3] h-20 bg-black/5">
+                    <img src={url} alt={`Damage ${idx + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(idx)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] opacity-90 hover:opacity-100"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 bg-[#F8F6F0] rounded-xl border border-dashed border-[#E5DFD3] text-center text-[10px] font-semibold text-[#6B7280]">
+                No photos attached yet. Tap "+ Add Photo" to snap existing bumper or scratch photos.
+              </div>
+            )}
           </div>
 
           {/* Notes */}

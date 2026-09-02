@@ -22,8 +22,8 @@ export const DriverUpiModal = () => {
   if (!driverUpiModalData) return null;
 
   const { booking, amount, endKm, tollParking, driverBata } = driverUpiModalData;
-  const ownerUpiId = business.upiId || 'shreeganesh.tours@okhdfcbank';
-  const ownerBizName = business.name || 'Shree Ganesh Tours & Travels';
+  const ownerUpiId = business.upiId || 'office@upi';
+  const ownerBizName = business.name || 'Fleet Office';
 
   const [copied, setCopied] = useState(false);
 

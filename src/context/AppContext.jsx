@@ -10,7 +10,7 @@ import {
   initialTransactions
 } from '../data/seedData';
 import { translations } from '../theme/i18n';
-import { supabase, checkSupabaseHealth } from '../lib/supabase';
+import { supabase, checkSupabaseHealth, isSupabasePausedError } from '../lib/supabase';
 import { supabaseApi } from '../services/supabaseApi';
 
 const AppContext = createContext();
@@ -20,6 +20,11 @@ export const AppProvider = ({ children }) => {
   const [isCloudConnected, setIsCloudConnected] = useState(false);
   const [cloudSyncStatus, setCloudSyncStatus] = useState('syncing'); // 'synced' | 'syncing' | 'offline' | 'error'
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
+
+  // Supabase Project Pause / Kill-Switch Lockdown State
+  const [isProjectPaused, setIsProjectPaused] = useState(false);
+  const [isCheckingProjectHealth, setIsCheckingProjectHealth] = useState(true);
+  const [projectPausedReason, setProjectPausedReason] = useState('');
 
   // Authentication State (stored in localStorage)
   const [authUser, setAuthUser] = useState(() => {
@@ -36,22 +41,55 @@ export const AppProvider = ({ children }) => {
 
   const [business, setBusiness] = useState(() => {
     const saved = localStorage.getItem('gd_business');
-    return saved ? JSON.parse(saved) : initialBusiness;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.id === 'biz-001' && parsed.ownerName === 'Ramesh Gaikwad') {
+          return initialBusiness;
+        }
+        return parsed;
+      } catch {
+        return initialBusiness;
+      }
+    }
+    return initialBusiness;
   });
 
   const [vehicles, setVehicles] = useState(() => {
     const saved = localStorage.getItem('gd_vehicles');
-    return saved ? JSON.parse(saved) : initialVehicles;
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      // If legacy mock vehicles MH 12 RN 4589 present, purge
+      if (Array.isArray(parsed) && parsed.some(v => v.plate === 'MH 12 RN 4589')) return [];
+      return parsed;
+    } catch {
+      return [];
+    }
   });
 
   const [drivers, setDrivers] = useState(() => {
     const saved = localStorage.getItem('gd_drivers');
-    return saved ? JSON.parse(saved) : initialDrivers;
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.some(d => d.name === 'Sachin Shinde')) return [];
+      return parsed;
+    } catch {
+      return [];
+    }
   });
 
   const [customers, setCustomers] = useState(() => {
     const saved = localStorage.getItem('gd_customers');
-    return saved ? JSON.parse(saved) : initialCustomers;
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.some(c => c.name === 'Rahul Deshmukh')) return [];
+      return parsed;
+    } catch {
+      return [];
+    }
   });
 
   const [rateCards, setRateCards] = useState(() => {
@@ -61,18 +99,101 @@ export const AppProvider = ({ children }) => {
 
   const [bookings, setBookings] = useState(() => {
     const saved = localStorage.getItem('gd_bookings');
-    return saved ? JSON.parse(saved) : initialBookings;
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.some(b => b.id === 'bk-01')) return [];
+      return parsed;
+    } catch {
+      return [];
+    }
   });
 
   const [expenses, setExpenses] = useState(() => {
     const saved = localStorage.getItem('gd_expenses');
-    return saved ? JSON.parse(saved) : initialExpenses;
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.some(e => e.id === 'exp-01')) return [];
+      return parsed;
+    } catch {
+      return [];
+    }
   });
 
   const [transactions, setTransactions] = useState(() => {
     const saved = localStorage.getItem('gd_transactions');
-    return saved ? JSON.parse(saved) : initialTransactions;
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.some(t => t.id === 'tx-01')) return [];
+      return parsed;
+    } catch {
+      return [];
+    }
   });
+
+  // Automatically purge legacy mock development data from localStorage
+  useEffect(() => {
+    try {
+      const savedBiz = localStorage.getItem('gd_business');
+      if (savedBiz) {
+        const parsed = JSON.parse(savedBiz);
+        if (parsed.id === 'biz-001' && parsed.ownerName === 'Ramesh Gaikwad') {
+          localStorage.removeItem('gd_business');
+          localStorage.removeItem('gd_vehicles');
+          localStorage.removeItem('gd_drivers');
+          localStorage.removeItem('gd_customers');
+          localStorage.removeItem('gd_bookings');
+          localStorage.removeItem('gd_expenses');
+          localStorage.removeItem('gd_transactions');
+          localStorage.removeItem('gd_invoices');
+          localStorage.removeItem('gd_driver_submissions');
+          localStorage.removeItem('gd_auth_user');
+          setBusiness(initialBusiness);
+          setVehicles([]);
+          setDrivers([]);
+          setCustomers([]);
+          setBookings([]);
+          setExpenses([]);
+          setTransactions([]);
+          setInvoices([]);
+          setDriverSubmissions([]);
+          setAuthUser(null);
+        }
+      }
+    } catch (e) {
+      console.warn('[Auto-purge Mock Data Error]:', e);
+    }
+  }, []);
+
+  const [invoices, setInvoices] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gd_invoices');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [driverSubmissions, setDriverSubmissions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gd_driver_submissions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [editingBooking, setEditingBooking] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem('gd_invoices', JSON.stringify(invoices));
+  }, [invoices]);
+
+  useEffect(() => {
+    localStorage.setItem('gd_driver_submissions', JSON.stringify(driverSubmissions));
+  }, [driverSubmissions]);
 
   // Active Screen / Tab Navigation
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'trips' | 'fleet' | 'money' | 'more'
@@ -169,29 +290,160 @@ export const AppProvider = ({ children }) => {
   // ============================================================================
   // SUPABASE CLOUD HYDRATION & BIDIRECTIONAL SYNC ENGINE
   // ============================================================================
+  const drainOfflineQueue = useCallback(async (businessId) => {
+    try {
+      const raw = localStorage.getItem('gd_offline_queue');
+      if (!raw) return;
+      const queue = JSON.parse(raw);
+      if (!Array.isArray(queue) || queue.length === 0) return;
+
+      const remaining = [];
+      for (const item of queue) {
+        try {
+          if (item.type === 'saveBooking') await supabaseApi.saveBooking(item.payload, businessId);
+          else if (item.type === 'saveVehicle') await supabaseApi.saveVehicle(item.payload, businessId);
+          else if (item.type === 'saveDriver') await supabaseApi.saveDriver(item.payload, businessId);
+          else if (item.type === 'saveCustomer') await supabaseApi.saveCustomer(item.payload, businessId);
+          else if (item.type === 'saveExpense') await supabaseApi.saveExpense(item.payload, businessId);
+          else if (item.type === 'saveTransaction') await supabaseApi.saveTransaction(item.payload, businessId);
+          else if (item.type === 'saveInvoice') await supabaseApi.saveInvoice(item.payload, businessId);
+          else if (item.type === 'saveDriverSubmission') await supabaseApi.saveDriverSubmission(item.payload, businessId);
+          else if (item.type === 'deleteBooking') await supabaseApi.deleteBooking(item.payload);
+        } catch {
+          remaining.push(item);
+        }
+      }
+      localStorage.setItem('gd_offline_queue', JSON.stringify(remaining));
+    } catch (e) {
+      console.warn('[Offline Queue Drain Error]:', e);
+    }
+  }, []);
+
+  const checkProjectStatus = useCallback(async () => {
+    try {
+      const health = await checkSupabaseHealth();
+      if (health.isPaused) {
+        setIsProjectPaused(true);
+        setProjectPausedReason(health.error || 'Project is paused by administrator');
+        setIsCloudConnected(false);
+        setCloudSyncStatus('offline');
+        return false;
+      } else if (health.isConnected) {
+        setIsProjectPaused(false);
+        setProjectPausedReason('');
+        setIsCloudConnected(true);
+        return true;
+      } else {
+        const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+        if (isOnline) {
+          setIsProjectPaused(true);
+          setProjectPausedReason(health.error || 'Project unreachable');
+          setIsCloudConnected(false);
+          setCloudSyncStatus('offline');
+          return false;
+        }
+        return false;
+      }
+    } catch (err) {
+      console.warn('[CheckProjectStatus Error]:', err);
+      return false;
+    } finally {
+      setIsCheckingProjectHealth(false);
+    }
+  }, []);
+
+  // Run on startup
+  useEffect(() => {
+    checkProjectStatus();
+  }, [checkProjectStatus]);
+
+  // Heartbeat check every 30s, on tab focus, and on status broadcast events
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkProjectStatus();
+    }, 30000);
+
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        checkProjectStatus();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleVisibilityOrFocus);
+    }
+
+    const handleStatusEvent = (e) => {
+      if (e.detail?.isPaused) {
+        setIsProjectPaused(true);
+        setProjectPausedReason(e.detail.error || 'Supabase project paused');
+        setIsCloudConnected(false);
+      } else if (e.detail?.isConnected) {
+        setIsProjectPaused(false);
+        setProjectPausedReason('');
+        setIsCloudConnected(true);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('gaadidesk:supabase_status', handleStatusEvent);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleVisibilityOrFocus);
+        window.removeEventListener('gaadidesk:supabase_status', handleStatusEvent);
+      }
+    };
+  }, [checkProjectStatus]);
+
   const syncWithCloud = useCallback(async (manual = false) => {
     try {
       if (manual) setCloudSyncStatus('syncing');
       const health = await checkSupabaseHealth();
+      if (health.isPaused) {
+        setIsProjectPaused(true);
+        setProjectPausedReason(health.error || 'Supabase project paused');
+        setIsCloudConnected(false);
+        setCloudSyncStatus('offline');
+        return false;
+      }
       if (!health.isConnected) {
         setIsCloudConnected(false);
         setCloudSyncStatus('offline');
         return false;
       }
 
+      setIsProjectPaused(false);
+      setProjectPausedReason('');
       setIsCloudConnected(true);
-      const businessId = business?.id || 'biz-001';
+      const businessId = business?.id;
+      if (!businessId) {
+        setCloudSyncStatus('synced');
+        return false;
+      }
+
+      // Drain any offline mutations first
+      await drainOfflineQueue(businessId);
+
       const cloudData = await supabaseApi.fetchFullBusinessData(businessId);
 
       if (cloudData.isLoaded) {
         if (cloudData.business) setBusiness(cloudData.business);
-        if (cloudData.vehicles?.length) setVehicles(cloudData.vehicles);
-        if (cloudData.drivers?.length) setDrivers(cloudData.drivers);
-        if (cloudData.customers?.length) setCustomers(cloudData.customers);
+        if (cloudData.vehicles) setVehicles(cloudData.vehicles);
+        if (cloudData.drivers) setDrivers(cloudData.drivers);
+        if (cloudData.customers) setCustomers(cloudData.customers);
         if (cloudData.rateCards?.length) setRateCards(cloudData.rateCards);
-        if (cloudData.bookings?.length) setBookings(cloudData.bookings);
-        if (cloudData.expenses?.length) setExpenses(cloudData.expenses);
-        if (cloudData.transactions?.length) setTransactions(cloudData.transactions);
+        if (cloudData.bookings) setBookings(cloudData.bookings);
+        if (cloudData.expenses) setExpenses(cloudData.expenses);
+        if (cloudData.transactions) setTransactions(cloudData.transactions);
+        if (cloudData.invoices) setInvoices(cloudData.invoices);
+        if (cloudData.driverSubmissions) setDriverSubmissions(cloudData.driverSubmissions);
 
         setCloudSyncStatus('synced');
         setLastSyncedAt(new Date());
@@ -199,19 +451,27 @@ export const AppProvider = ({ children }) => {
       }
     } catch (err) {
       console.warn('[AppContext] Sync with Supabase cloud failed:', err);
+      if (isSupabasePausedError(err)) {
+        setIsProjectPaused(true);
+        setProjectPausedReason('Supabase project paused');
+      }
       setCloudSyncStatus('offline');
       return false;
     }
-  }, [business?.id]);
+  }, [business?.id, drainOfflineQueue]);
 
   useEffect(() => {
     let isMounted = true;
+    const businessId = business?.id;
+    if (!businessId) return;
+
     syncWithCloud();
 
-    // Setup Supabase Realtime channel for live multi-user / driver sync
-    const channel = supabase.channel('gaadidesk_realtime_db')
+    // Setup Supabase Realtime channel scoped by business_id for live multi-user / driver sync
+    const channel = supabase.channel(`gaadidesk_realtime_${businessId}`)
       .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        console.log('[Supabase Live Change Detected]:', payload.table, payload.eventType);
+        // If event specifies business_id, ensure it matches
+        if (payload.new?.business_id && payload.new.business_id !== businessId) return;
         if (isMounted) {
           syncWithCloud();
         }
@@ -222,7 +482,7 @@ export const AppProvider = ({ children }) => {
       isMounted = false;
       supabase.removeChannel(channel);
     };
-  }, [syncWithCloud]);
+  }, [syncWithCloud, business?.id]);
 
 
   // Translation Helper
@@ -301,7 +561,7 @@ export const AppProvider = ({ children }) => {
     // 3. Check overlapping bookings
     bookings.forEach(b => {
       if (excludeBookingId && b.id === excludeBookingId) return;
-      if (b.status === 'Cancelled' || b.status === 'Completed') return;
+      if (b.status === 'Cancelled' || b.status === 'Completed' || b.status === 'Enquiry') return;
 
       const bStart = new Date(b.startDateTime).getTime();
       const bEnd = new Date(b.endDateTime).getTime();
@@ -741,11 +1001,11 @@ export const AppProvider = ({ children }) => {
       }
     }
 
-    // Update Customer details and pending balance delta in CRM
+    // Update Customer details and pending balance delta in CRM (Enquiries and Cancelled do not count as debt)
     if (bookingData.customerName) {
       setCustomers(prev => {
-        const oldPending = existingBooking ? Number(existingBooking.balancePending || 0) : 0;
-        const newPending = Number(bookingData.balancePending || 0);
+        const oldPending = existingBooking && existingBooking.status !== 'Enquiry' && existingBooking.status !== 'Cancelled' ? Number(existingBooking.balancePending || 0) : 0;
+        const newPending = bookingData.status !== 'Enquiry' && bookingData.status !== 'Cancelled' ? Number(bookingData.balancePending || 0) : 0;
         const deltaPending = newPending - oldPending;
 
         if (existingCustomerMatch) {
@@ -765,13 +1025,23 @@ export const AppProvider = ({ children }) => {
             phone: bookingData.customerPhone || '9876543210',
             type: 'Personal',
             totalBookings: 1,
-            pendingBalance: Math.max(0, Number(bookingData.balancePending || 0)),
+            pendingBalance: (bookingData.status === 'Enquiry' || bookingData.status === 'Cancelled') ? 0 : Math.max(0, Number(bookingData.balancePending || 0)),
             address: bookingData.pickupLocation || ''
           };
           supabaseApi.saveCustomer(newCust, business?.id || 'biz-001').catch(() => {});
           return [newCust, ...prev];
         }
       });
+    }
+
+    // Free previously assigned vehicle/driver if reassigned during edit
+    if (existingBooking) {
+      if (existingBooking.vehicleId && existingBooking.vehicleId !== newBooking.vehicleId) {
+        setVehicles(prev => prev.map(v => v.id === existingBooking.vehicleId ? { ...v, status: 'Free' } : v));
+      }
+      if (existingBooking.driverId && existingBooking.driverId !== newBooking.driverId) {
+        setDrivers(prev => prev.map(d => d.id === existingBooking.driverId ? { ...d, status: 'Available' } : d));
+      }
     }
 
     // Update Vehicle & Driver Status if Ongoing
@@ -798,7 +1068,50 @@ export const AppProvider = ({ children }) => {
       }
     }
 
+    // Clear edit state
+    setEditingBooking(null);
+
     return newBooking;
+  };
+
+  // Open existing booking in Edit Mode
+  const openEditBooking = (booking) => {
+    setEditingBooking(booking);
+    setNewBookingPrefill(booking);
+    setIsNewBookingOpen(true);
+  };
+
+  // Delete Booking with CRM and fleet status rollback
+  const deleteBooking = (bookingId) => {
+    const target = bookings.find(b => b.id === bookingId);
+    if (!target) return;
+
+    // Rollback pending balance from customer CRM if applicable
+    if (target.customerName && Number(target.balancePending || 0) > 0 && target.status !== 'Cancelled' && target.status !== 'Enquiry') {
+      setCustomers(prev => prev.map(c => {
+        if (c.id === target.customerId || c.name.toLowerCase() === target.customerName.toLowerCase()) {
+          const updatedCust = {
+            ...c,
+            pendingBalance: Math.max(0, (c.pendingBalance || 0) - Number(target.balancePending || 0))
+          };
+          supabaseApi.saveCustomer(updatedCust, business?.id || 'biz-001').catch(() => {});
+          return updatedCust;
+        }
+        return c;
+      }));
+    }
+
+    // Free assigned vehicle
+    if (target.vehicleId && (target.status === 'Ongoing' || target.status === 'Driver Assigned')) {
+      setVehicles(prev => prev.map(v => v.id === target.vehicleId ? { ...v, status: 'Free' } : v));
+    }
+    // Free assigned driver
+    if (target.driverId && (target.status === 'Ongoing' || target.status === 'Driver Assigned')) {
+      setDrivers(prev => prev.map(d => d.id === target.driverId ? { ...d, status: 'Available' } : d));
+    }
+
+    setBookings(prev => prev.filter(b => b.id !== bookingId));
+    supabaseApi.deleteBooking(bookingId).catch(err => console.warn('[Delete Booking Error]:', err));
   };
 
   // Start Trip action: transitions trip to Ongoing, marks vehicle & driver On Trip
@@ -857,6 +1170,9 @@ export const AppProvider = ({ children }) => {
       endKm,
       actualKm,
       extraKmCharges,
+      extraHours,
+      extraHoursCharges,
+      nightHalt,
       tollParking,
       driverBata,
       discount,
@@ -867,12 +1183,20 @@ export const AppProvider = ({ children }) => {
     } = settlementData;
 
     // Zero Double-Counting Fare Formula:
-    // Base Fare + Actual Extra KM Charges + Actual Driver Bata - Actual Discount
+    // Base Fare + Extra KM + Extra Hours + Driver Bata + Night Halt - Discount
     const baseFare = Number(targetBooking.baseFare || 0);
-    const taxableAmount = Math.max(0, baseFare + Number(extraKmCharges || 0) + Number(driverBata || 0) - Number(discount || 0));
+    const resolvedExtraKmCharges = Number(extraKmCharges || 0);
+    const resolvedExtraHours = Number(extraHours || 0);
+    const resolvedExtraHoursCharges = Number(extraHoursCharges || 0);
+    const resolvedDriverBata = Number(driverBata !== undefined ? driverBata : (targetBooking.driverBata || 0));
+    const resolvedNightHalt = Number(nightHalt !== undefined ? nightHalt : (targetBooking.nightHalt || 0));
+    const resolvedDiscount = Number(discount || 0);
+    const resolvedTollParking = Number(tollParking !== undefined ? tollParking : (targetBooking.tollParking || 0));
+
+    const taxableAmount = Math.max(0, baseFare + resolvedExtraKmCharges + resolvedExtraHoursCharges + resolvedDriverBata + resolvedNightHalt - resolvedDiscount);
     const gstPercent = targetBooking.gstEnabled ? Number(targetBooking.gstPercent || 5) : 0;
     const gstAmount = Math.round(taxableAmount * (gstPercent / 100));
-    const totalFare = taxableAmount + gstAmount + Number(tollParking || 0);
+    const totalFare = taxableAmount + gstAmount + resolvedTollParking;
 
     const prevAdvance = Number(targetBooking.advancePaid || 0);
     const finalPaid = Number(finalPaidAmount || 0);
@@ -894,15 +1218,19 @@ export const AppProvider = ({ children }) => {
       endKm: resolvedEndKm,
       endOdometer: resolvedEndKm,
       actualKm: Number(actualKm || (resolvedEndKm - resolvedStartKm) || 0),
-      extraKmCharges: Number(extraKmCharges || 0),
-      driverBata: Number(driverBata || targetBooking.driverBata || 0),
-      tollParking: Number(tollParking || 0),
-      discount: Number(discount || 0),
+      extraKmCharges: resolvedExtraKmCharges,
+      extraHours: resolvedExtraHours,
+      extraHoursCharges: resolvedExtraHoursCharges,
+      driverBata: resolvedDriverBata,
+      nightHalt: resolvedNightHalt,
+      tollParking: resolvedTollParking,
+      discount: resolvedDiscount,
       taxableAmount,
       gstAmount,
       totalFare,
-      advancePaid: totalCollected,
+      advancePaid: prevAdvance, // Preserved exact advance paid upfront
       finalPaidAmount: finalPaid,
+      totalPaid: totalCollected, // Full total collected (advance + final)
       balancePending: finalBalancePending,
       settlementMode: settlementPaymentMode,
       settlementPaymentMode: settlementPaymentMode,
@@ -1080,10 +1408,22 @@ export const AppProvider = ({ children }) => {
     setVehicles(prev => prev.map(v => {
       if (v.id !== vehicleId) return v;
       const updatedDocs = { ...v.documents };
-      if (docType === 'Insurance') updatedDocs.insuranceExpiry = newExpiryDate;
-      else if (docType === 'PUC') updatedDocs.pucExpiry = newExpiryDate;
-      else if (docType === 'Fitness') updatedDocs.fitnessExpiry = newExpiryDate;
-      else if (docType === 'Permit') updatedDocs.permitExpiry = newExpiryDate;
+      if (docType === 'Insurance') {
+        updatedDocs.insuranceExpiry = newExpiryDate;
+        if (docNumber) updatedDocs.insuranceNumber = docNumber;
+      } else if (docType === 'PUC') {
+        updatedDocs.pucExpiry = newExpiryDate;
+        if (docNumber) updatedDocs.pucNumber = docNumber;
+      } else if (docType === 'Fitness') {
+        updatedDocs.fitnessExpiry = newExpiryDate;
+        if (docNumber) updatedDocs.fitnessNumber = docNumber;
+      } else if (docType === 'Permit') {
+        updatedDocs.permitExpiry = newExpiryDate;
+        if (docNumber) updatedDocs.permitNumber = docNumber;
+      } else if (docType === 'RC Book' || docType === 'RC') {
+        updatedDocs.rcExpiry = newExpiryDate;
+        if (docNumber) updatedDocs.rcNumber = docNumber;
+      }
 
       const updatedV = {
         ...v,
@@ -1299,16 +1639,17 @@ export const AppProvider = ({ children }) => {
     }));
   };
 
-  // Settle Customer Dues in CRM
+  // Settle Customer Dues in CRM & Reconcile Bookings
   const settleCustomerPayment = (customerId, amount, paymentMode, notes = '') => {
     const cust = customers.find(c => c.id === customerId);
     if (!cust) return;
+    const numAmount = Number(amount);
 
     setCustomers(prev => prev.map(c => {
       if (c.id === customerId) {
         const updatedC = {
           ...c,
-          pendingBalance: Math.max(0, (c.pendingBalance || 0) - Number(amount))
+          pendingBalance: Math.max(0, (c.pendingBalance || 0) - numAmount)
         };
         supabaseApi.saveCustomer(updatedC, business?.id || 'biz-001').catch(() => {});
         return updatedC;
@@ -1316,10 +1657,44 @@ export const AppProvider = ({ children }) => {
       return c;
     }));
 
+    // Reconcile and deduct balancePending from customer's completed bookings (oldest first)
+    let remainingToReconcile = numAmount;
+    if (remainingToReconcile > 0) {
+      setBookings(prev => {
+        const updated = [...prev];
+        const unpaidTrips = updated
+          .map((b, idx) => ({ b, idx }))
+          .filter(({ b }) =>
+            (b.customerId === customerId ||
+             (cust.name && b.customerName?.toLowerCase() === cust.name.toLowerCase()) ||
+             (cust.phone && b.customerPhone && b.customerPhone.replace(/\D/g, '').slice(-10) === cust.phone.replace(/\D/g, '').slice(-10))) &&
+            Number(b.balancePending || 0) > 0
+          )
+          .sort((a, b) => new Date(a.b.startDateTime) - new Date(b.b.startDateTime));
+
+        for (const { b, idx } of unpaidTrips) {
+          if (remainingToReconcile <= 0) break;
+          const due = Number(b.balancePending || 0);
+          const payTowardsThis = Math.min(due, remainingToReconcile);
+          remainingToReconcile -= payTowardsThis;
+          const updatedTrip = {
+            ...b,
+            balancePending: Math.max(0, due - payTowardsThis),
+            finalPaidAmount: Number(b.finalPaidAmount || 0) + payTowardsThis,
+            totalPaid: Number(b.totalPaid || (Number(b.advancePaid || 0) + Number(b.finalPaidAmount || 0))) + payTowardsThis,
+            settlementNotes: b.settlementNotes ? `${b.settlementNotes} | Settled ₹${payTowardsThis}` : `Settled ₹${payTowardsThis}`
+          };
+          updated[idx] = updatedTrip;
+          supabaseApi.saveBooking(updatedTrip, business?.id || 'biz-001').catch(() => {});
+        }
+        return updated;
+      });
+    }
+
     recordTransaction({
       type: 'Income',
       category: 'Customer Due Settlement',
-      amount: Number(amount),
+      amount: numAmount,
       paymentMode: paymentMode || 'UPI',
       customerId: cust.id,
       customerName: cust.name,
@@ -1353,13 +1728,11 @@ export const AppProvider = ({ children }) => {
     const totalCollectedToday = cashToday + upiToday + bankToday;
     const pendingCustomers = customers.reduce((sum, c) => sum + Number(c.pendingBalance || 0), 0);
 
-    // Driver held cash calculation (Cash advances and settlements on ongoing trips)
-    let driverCash = 0;
-    bookings.forEach(b => {
-      if (b.status === 'Ongoing' && b.advanceMode === 'Cash') {
-        driverCash += Number(b.advancePaid || 0);
-      }
-    });
+    // Live unsubmitted cash with drivers (verified cash only)
+    const driverCash = drivers.reduce((sum, d) => {
+      const stats = getDriverCashStats(d.id);
+      return sum + Number(stats.netCashDue || 0);
+    }, 0);
 
     const netProfitToday = totalCollectedToday - expensesToday;
 
@@ -1377,44 +1750,42 @@ export const AppProvider = ({ children }) => {
 
   // Multi-Period Fleet Financial & Operational Analytics Engine
   const getPeriodAnalytics = (period = analyticsPeriod || '30d') => {
-    // Current reference date (anchor: 2026-08-30)
-    const now = new Date('2026-08-30T23:59:59');
+    const now = new Date();
     let daysCount = 30;
     let periodLabel = 'Last 30 Days';
-    let dateRangeText = '1 Aug 2026 – 30 Aug 2026';
     let cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const fmtDate = (d) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
     if (period === '7d') {
       daysCount = 7;
       periodLabel = 'Last 7 Days';
-      dateRangeText = '24 Aug 2026 – 30 Aug 2026';
       cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     } else if (period === '30d') {
       daysCount = 30;
       periodLabel = 'Last 30 Days';
-      dateRangeText = '1 Aug 2026 – 30 Aug 2026';
       cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     } else if (period === '90d') {
       daysCount = 90;
       periodLabel = 'Last 90 Days (Quarter)';
-      dateRangeText = '1 Jun 2026 – 30 Aug 2026';
       cutoffDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     } else if (period === '6m') {
       daysCount = 180;
       periodLabel = 'Last 6 Months';
-      dateRangeText = '1 Mar 2026 – 30 Aug 2026';
       cutoffDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
     } else if (period === '1y') {
       daysCount = 365;
-      periodLabel = 'Last 1 Year (FY 2025-26)';
-      dateRangeText = '1 Sep 2025 – 30 Aug 2026';
+      periodLabel = 'Last 1 Year';
       cutoffDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
     } else if (period === 'all') {
       daysCount = 450;
       periodLabel = 'All Time Lifetime';
-      dateRangeText = 'Lifetime Operational History';
       cutoffDate = new Date(0);
     }
+
+    const dateRangeText = period === 'all' 
+      ? 'Lifetime Operational History' 
+      : `${fmtDate(cutoffDate)} – ${fmtDate(now)}`;
 
     // Filtered bookings in period
     const filteredBookings = bookings.filter(b => {
@@ -1759,7 +2130,24 @@ export const AppProvider = ({ children }) => {
 
   // Delete Expense
   const deleteExpense = (expenseId) => {
+    const targetExp = expenses.find(e => e.id === expenseId);
     setExpenses(prev => prev.filter(e => e.id !== expenseId));
+
+    if (targetExp) {
+      setTransactions(prev => {
+        const matchingTx = prev.find(tx =>
+          tx.type === 'Expense' &&
+          Number(tx.amount) === Number(targetExp.amount) &&
+          (tx.vehicleId === targetExp.vehicleId || tx.notes === (targetExp.description || ''))
+        );
+        if (matchingTx) {
+          supabaseApi.deleteTransaction(matchingTx.id).catch(() => {});
+          return prev.filter(tx => tx.id !== matchingTx.id);
+        }
+        return prev;
+      });
+    }
+
     supabaseApi.deleteExpense(expenseId)
       .then(() => setLastSyncedAt(new Date()))
       .catch(err => console.warn('[Supabase Delete Expense Error]:', err));
@@ -1801,8 +2189,15 @@ export const AppProvider = ({ children }) => {
       .catch(err => console.warn('[Supabase Delete RateCard Error]:', err));
   };
 
-  // Add Vehicle
+  // Add Vehicle with SaaS Plan Limit Enforcement
   const addVehicle = (vehicleData) => {
+    const currentLimit = Number(business?.vehicleLimit || 15);
+    if (vehicles.length >= currentLimit) {
+      alert(`⚠️ Vehicle limit reached (${vehicles.length}/${currentLimit} cars) for your ${business.membershipPlan || 'current'} plan.\n\nPlease upgrade your membership to add more fleet vehicles.`);
+      setIsMembershipOpen(true);
+      return false;
+    }
+
     const newVeh = {
       ...vehicleData,
       id: `veh-${Date.now().toString().slice(-4)}`,
@@ -1821,6 +2216,8 @@ export const AppProvider = ({ children }) => {
     supabaseApi.saveVehicle(newVeh, business?.id || 'biz-001')
       .then(() => setLastSyncedAt(new Date()))
       .catch(err => console.warn('[Supabase Sync Vehicle Error]:', err));
+
+    return newVeh;
   };
 
   // Update Vehicle
@@ -2017,6 +2414,10 @@ export const AppProvider = ({ children }) => {
 
   // Authentication Handlers
   const openAuthModal = (mode = 'register') => {
+    if (isProjectPaused) {
+      alert('GaadiDesk workspace is currently paused by the administrator. Operations are disabled.');
+      return;
+    }
     setAuthMode(mode);
     setIsAuthModalOpen(true);
   };
@@ -2025,13 +2426,43 @@ export const AppProvider = ({ children }) => {
     setIsAuthModalOpen(false);
   };
 
-  const loginUser = (userData) => {
+  const loginUser = async (userData) => {
+    if (isProjectPaused) {
+      throw new Error('GaadiDesk workspace is currently paused by the administrator. Operations are disabled.');
+    }
     const rawInputPhone = (userData.phone || '').replace(/\D/g, '');
-    
-    // Auto-detect if phone belongs to a Driver in the fleet
+    const cleanEmail = (userData.email || '').trim().toLowerCase();
+    const identifier = cleanEmail || rawInputPhone;
+
+    // 1. Check in Supabase cloud profiles / businesses
+    let cloudProfile = null;
+    if (identifier) {
+      cloudProfile = await supabaseApi.findProfileByPhoneOrEmail(identifier);
+    }
+
+    // 2. Auto-detect if user is a Driver
+    if (cloudProfile && cloudProfile.role === 'driver') {
+      const driverUser = {
+        role: 'driver',
+        driverId: cloudProfile.id.replace(/^usr-/, ''),
+        name: cloudProfile.name,
+        phone: cloudProfile.phone,
+        email: cloudProfile.email || cleanEmail,
+        businessId: cloudProfile.businessId,
+        token: `gd_driver_token_${Date.now()}`
+      };
+      setAuthUser(driverUser);
+      setDriverActiveTab('duty');
+      setIsAuthModalOpen(false);
+      return driverUser;
+    }
+
+    // Local fleet driver fallback
     const matchedDriver = drivers.find(d => {
       const cleanDrvPhone = (d.phone || '').replace(/\D/g, '');
-      return cleanDrvPhone.endsWith(rawInputPhone.slice(-10)) || (rawInputPhone.length >= 10 && cleanDrvPhone.includes(rawInputPhone.slice(-10)));
+      const cleanDrvEmail = (d.email || '').toLowerCase().trim();
+      return (rawInputPhone && cleanDrvPhone.endsWith(rawInputPhone.slice(-10))) ||
+             (cleanEmail && cleanDrvEmail === cleanEmail);
     });
 
     if (matchedDriver) {
@@ -2040,47 +2471,56 @@ export const AppProvider = ({ children }) => {
         driverId: matchedDriver.id,
         name: matchedDriver.name,
         phone: matchedDriver.phone,
-        businessName: business.name || 'Shree Ganesh Tours & Travels',
-        city: business.city || 'Pune, MH',
+        email: matchedDriver.email || cleanEmail,
+        businessName: business.name || 'Fleet Services',
+        city: business.city || 'Maharashtra',
         payoutType: matchedDriver.payoutType || 'Salary',
-        token: `gd_driver_token_${Date.now()}`,
-        isDemo: Boolean(userData.isDemo)
+        token: `gd_driver_token_${Date.now()}`
       };
       setAuthUser(driverUser);
       setDriverActiveTab('duty');
       setIsAuthModalOpen(false);
-
-      // Save driver profile to Supabase
-      supabaseApi.saveProfile({
-        id: `usr-${matchedDriver.id}`,
-        businessId: business.id || 'biz-001',
-        role: 'driver',
-        name: matchedDriver.name,
-        phone: matchedDriver.phone
-      }).catch(() => {});
-
       return driverUser;
     }
 
-    // Otherwise login as Fleet Owner
+    // 3. Otherwise login as Fleet Owner
+    const targetBusinessId = cloudProfile?.businessId || business?.id || `biz-${Date.now().toString().slice(-6)}`;
     const ownerUser = {
       role: 'owner',
-      name: userData.name || business.ownerName || 'Fleet Owner',
-      phone: userData.phone || '9822012345',
-      businessName: userData.businessName || business.name || 'My Fleet & Travels',
-      city: userData.city || business.city || 'Maharashtra',
-      plan: userData.plan || business.membershipPlan || 'Starter (5 Cars)',
-      membershipStatus: 'Active',
-      token: `gd_token_${Date.now()}`,
-      isDemo: Boolean(userData.isDemo)
+      name: cloudProfile?.name || userData.name || business.ownerName || 'Fleet Owner',
+      phone: cloudProfile?.phone || userData.phone || business.phone || '',
+      email: cloudProfile?.email || userData.email || business.email || '',
+      businessId: targetBusinessId,
+      businessName: cloudProfile?.business?.name || userData.businessName || business.name || 'My Fleet Services',
+      city: cloudProfile?.business?.city || userData.city || business.city || 'Maharashtra',
+      plan: cloudProfile?.business?.membershipPlan || userData.plan || business.membershipPlan || 'Starter (5 Cars)',
+      membershipStatus: cloudProfile?.business?.membershipStatus || 'Active',
+      token: `gd_token_${Date.now()}`
     };
+
     setAuthUser(ownerUser);
-    if (userData.businessName) {
+
+    if (cloudProfile?.business) {
+      setBusiness(cloudProfile.business);
+      supabaseApi.fetchFullBusinessData(targetBusinessId).then(cloudData => {
+        if (cloudData.isLoaded) {
+          if (cloudData.vehicles) setVehicles(cloudData.vehicles);
+          if (cloudData.drivers) setDrivers(cloudData.drivers);
+          if (cloudData.customers) setCustomers(cloudData.customers);
+          if (cloudData.bookings) setBookings(cloudData.bookings);
+          if (cloudData.expenses) setExpenses(cloudData.expenses);
+          if (cloudData.transactions) setTransactions(cloudData.transactions);
+          if (cloudData.invoices) setInvoices(cloudData.invoices);
+        }
+      }).catch(() => {});
+    } else if (userData.businessName) {
       const updatedBiz = {
         ...business,
+        id: targetBusinessId,
         name: userData.businessName,
         ownerName: userData.name || business.ownerName,
         phone: userData.phone || business.phone,
+        email: userData.email || business.email,
         whatsapp: userData.whatsapp || userData.phone || business.whatsapp,
         city: userData.city || business.city
       };
@@ -2088,66 +2528,101 @@ export const AppProvider = ({ children }) => {
       supabaseApi.saveBusiness(updatedBiz).catch(() => {});
     }
 
-    // Save profile to Supabase
-    supabaseApi.saveProfile({
-      id: `usr-owner-${Date.now().toString().slice(-4)}`,
-      businessId: business.id || 'biz-001',
-      role: 'owner',
-      name: ownerUser.name,
-      phone: ownerUser.phone
-    }).catch(() => {});
-
     setIsAuthModalOpen(false);
     setActiveTab('home');
     return ownerUser;
   };
 
-  const registerUser = (registrationData) => {
+  const registerUser = async (registrationData) => {
+    if (isProjectPaused) {
+      throw new Error('GaadiDesk workspace is currently paused by the administrator. Operations are disabled.');
+    }
+    const newBizId = `biz-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6)}`;
     const user = {
       role: 'owner',
-      name: registrationData.ownerName || 'New Fleet Owner',
-      phone: registrationData.phone,
+      name: registrationData.ownerName || 'Fleet Owner',
+      phone: registrationData.phone || '',
+      email: registrationData.email || '',
+      businessId: newBizId,
       businessName: registrationData.businessName || 'My Fleet Services',
       city: registrationData.city || 'Pune, MH',
       gstin: registrationData.gstin || '',
       businessTypes: registrationData.businessTypes || ['Cab', 'Rental'],
-      plan: registrationData.plan || 'Growth (15 Cars)',
+      plan: registrationData.plan || 'Starter (5 Cars)',
       membershipStatus: 'Trial (14 Days Free)',
-      token: `gd_token_${Date.now()}`,
-      isDemo: false
+      token: `gd_token_${Date.now()}`
     };
 
     setAuthUser(user);
-    const newBizId = `biz-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6)}`;
+
     const newBiz = {
-      ...business,
       id: newBizId,
       name: user.businessName,
       ownerName: user.name,
       phone: user.phone,
-      whatsapp: user.phone,
+      email: user.email,
+      whatsapp: user.phone || '',
       city: user.city,
       gstin: user.gstin,
       membershipPlan: user.plan,
-      membershipStatus: user.membershipStatus
+      membershipStatus: user.membershipStatus,
+      vehicleLimit: user.plan?.includes('15') ? 15 : (user.plan?.includes('40') ? 40 : 5),
+      staffLimit: 3
     };
+
     setBusiness(newBiz);
+    // Start with 100% clean empty state
+    setVehicles([]);
+    setDrivers([]);
+    setCustomers([]);
+    setBookings([]);
+    setExpenses([]);
+    setTransactions([]);
+    setInvoices([]);
+    setDriverSubmissions([]);
 
     // Save business & owner profile in Supabase
-    supabaseApi.saveBusiness(newBiz).catch(() => {});
+    supabaseApi.saveBusiness(newBiz).catch(e => console.warn('[Register Business Error]:', e));
     supabaseApi.saveProfile({
       id: `usr-owner-${Date.now().toString().slice(-4)}`,
-      businessId: newBiz.id || 'biz-001',
+      businessId: newBiz.id,
       role: 'owner',
       name: user.name,
-      phone: user.phone
-    }).catch(() => {});
+      phone: user.phone,
+      email: user.email
+    }).catch(e => console.warn('[Register Profile Error]:', e));
 
     setIsAuthModalOpen(false);
     setActiveTab('home');
+    return user;
+  };
+
+  const loginWithGoogle = async () => {
+    if (isProjectPaused) {
+      alert('GaadiDesk workspace is currently paused by the administrator. Operations are disabled.');
+      return null;
+    }
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.warn('[Google OAuth Error]:', err.message);
+      alert(`Google Sign-In: ${err.message}\n\nYou can also enter your Gmail address directly in the Email tab.`);
+      return null;
+    }
   };
 
   const quickDemoLogin = () => {
+    if (isProjectPaused) {
+      alert('GaadiDesk workspace is currently paused by the administrator. Operations are disabled.');
+      return;
+    }
     const demoUser = {
       role: 'owner',
       name: 'Ramesh Gaikwad',
@@ -2166,6 +2641,10 @@ export const AppProvider = ({ children }) => {
   };
 
   const quickDriverLogin = (driverId = 'drv-01') => {
+    if (isProjectPaused) {
+      alert('GaadiDesk workspace is currently paused by the administrator. Operations are disabled.');
+      return;
+    }
     const driver = drivers.find(d => d.id === driverId) || drivers[0];
     const driverUser = {
       role: 'driver',
@@ -2298,16 +2777,21 @@ export const AppProvider = ({ children }) => {
 
     const baseFare = Number(targetBooking.baseFare || 0);
     const driverBata = Number(settlementData.driverBata ?? targetBooking.driverBata ?? 0);
+    const nightHalt = Number(settlementData.nightHalt ?? targetBooking.nightHalt ?? 0);
+    const extraHours = Number(settlementData.extraHours || 0);
+    const extraHoursCharges = Number(settlementData.extraHoursCharges || 0);
     const tollParking = Number(settlementData.tollParking ?? targetBooking.tollParking ?? 0);
     const discount = Number(settlementData.discount || 0);
 
-    const taxableAmount = baseFare + extraKmCharges + driverBata - discount;
-    const gstAmount = targetBooking.gstEnabled ? Math.round(taxableAmount * ((targetBooking.gstPercent || 5) / 100)) : 0;
+    const taxableAmount = Math.max(0, baseFare + extraKmCharges + extraHoursCharges + driverBata + nightHalt - discount);
+    const gstPercent = targetBooking.gstEnabled ? Number(targetBooking.gstPercent || 5) : 0;
+    const gstAmount = Math.round(taxableAmount * (gstPercent / 100));
     const grossTotal = taxableAmount + gstAmount + tollParking;
-    const advancePaid = Number(targetBooking.advancePaid || 0);
-    const netDue = Math.max(0, grossTotal - advancePaid);
+    const prevAdvance = Number(targetBooking.advancePaid || 0);
+    const netDue = Math.max(0, grossTotal - prevAdvance);
     const finalPaidAmount = Number(settlementData.finalPaidAmount ?? netDue);
     const balanceRemaining = Math.max(0, netDue - finalPaidAmount);
+    const totalCollected = prevAdvance + finalPaidAmount;
     const paymentMode = settlementData.paymentMode || 'Cash';
 
     const nowIso = new Date().toISOString();
@@ -2320,13 +2804,18 @@ export const AppProvider = ({ children }) => {
       actualKm,
       extraKm,
       extraKmCharges,
+      extraHours,
+      extraHoursCharges,
       driverBata,
+      nightHalt,
       tollParking,
       discount,
       taxableAmount,
       gstAmount,
       totalFare: grossTotal,
+      advancePaid: prevAdvance, // Preserved original advance
       finalPaidAmount,
+      totalPaid: totalCollected,
       balancePending: balanceRemaining,
       settlementMode: paymentMode,
       settlementPaymentMode: paymentMode,
@@ -2406,6 +2895,8 @@ export const AppProvider = ({ children }) => {
 
     const driver = drivers.find(d => d.id === driverId);
     const driverName = driver?.name || 'Driver';
+    const submissionId = `sub-${Date.now().toString().slice(-6)}`;
+    const todayDate = new Date().toISOString().split('T')[0];
 
     recordTransaction({
       type: 'Income',
@@ -2415,21 +2906,50 @@ export const AppProvider = ({ children }) => {
       driverId: driverId,
       customerName: driverName,
       notes: `Cash handover from driver ${driverName}: ${notes || 'Daily settlement'}`,
-      date: new Date().toISOString().split('T')[0]
+      date: todayDate
     });
 
     const submissionRecord = {
-      id: `sub-${Date.now().toString().slice(-6)}`,
+      id: submissionId,
       driverId,
+      driverName,
       amount: numAmt,
-      date: new Date().toISOString(),
-      notes: notes || 'Office Cash Handover'
+      paymentMode: 'Cash',
+      date: todayDate,
+      notes: notes || 'Office Cash Handover',
+      status: 'Verified',
+      createdAt: new Date().toISOString()
     };
 
-    const existingSubs = JSON.parse(localStorage.getItem('gd_driver_submissions') || '[]');
-    localStorage.setItem('gd_driver_submissions', JSON.stringify([submissionRecord, ...existingSubs]));
+    setDriverSubmissions(prev => [submissionRecord, ...prev]);
+    supabaseApi.saveDriverSubmission(submissionRecord, business?.id || 'biz-001').catch(() => {});
 
     return submissionRecord;
+  };
+
+  const saveCorporateInvoice = (invoiceData) => {
+    const invId = invoiceData.id || `inv-${Date.now().toString().slice(-6)}`;
+    const newInv = {
+      ...invoiceData,
+      id: invId,
+      createdAt: new Date().toISOString()
+    };
+
+    setInvoices(prev => [newInv, ...prev]);
+    supabaseApi.saveInvoice(newInv, business?.id || 'biz-001').catch(() => {});
+
+    if (Array.isArray(newInv.bookingIds) && newInv.bookingIds.length > 0) {
+      setBookings(prev => prev.map(b => {
+        if (newInv.bookingIds.includes(b.id)) {
+          const updatedB = { ...b, isCorporateInvoiced: true, corporateInvoiceId: invId };
+          supabaseApi.saveBooking(updatedB, business?.id || 'biz-001').catch(() => {});
+          return updatedB;
+        }
+        return b;
+      }));
+    }
+
+    return newInv;
   };
 
   const updateDriverStatus = (driverId, status) => {
@@ -2457,12 +2977,14 @@ export const AppProvider = ({ children }) => {
     let totalBata = 0;
 
     driverBookings.forEach(b => {
-      if (b.advanceMode === 'Cash') {
+      // Only count advance if collected by driver, not office
+      if (b.advanceMode === 'Cash' && b.advanceCollectedBy === 'driver') {
         cashCollected += Number(b.advancePaid || 0);
       }
       const isSettledCash = b.settlementPaymentMode === 'Cash' || b.settlementMode === 'Cash' || (!b.settlementPaymentMode && !b.settlementMode && b.advanceMode === 'Cash');
+      // Count ONLY actual cash collected at trip end, NEVER uncollected debts (balancePending)!
       if (b.status === 'Completed' && isSettledCash) {
-        cashCollected += Number(b.finalPaidAmount || b.balancePending || 0);
+        cashCollected += Number(b.finalPaidAmount || 0);
       }
       if (b.status === 'Completed' || b.status === 'Ongoing') {
         totalBata += Number(b.driverBata || 0);
@@ -2472,18 +2994,17 @@ export const AppProvider = ({ children }) => {
     const driverExps = expenses.filter(e => e.driverId === driverId && e.paidBy === 'Driver');
     const reimbursableExpenses = driverExps.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
-    // Sum submissions from both central transaction ledger and local storage cache
+    // Sum submissions from driverSubmissions state and transaction ledger
+    const stateSubs = (driverSubmissions || []).filter(s => s.driverId === driverId);
+    const stateCashSubmitted = stateSubs.reduce((sum, s) => sum + Number(s.amount || 0), 0);
+
     const txSubs = transactions.filter(tx =>
       tx.category === 'Driver Cash Handover' &&
       (tx.driverId === driverId || (driver && tx.customerName === driver.name))
     );
     const txCashSubmitted = txSubs.reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
 
-    const localSubs = JSON.parse(localStorage.getItem('gd_driver_submissions') || '[]');
-    const driverSubs = localSubs.filter(s => s.driverId === driverId);
-    const localCashSubmitted = driverSubs.reduce((sum, s) => sum + Number(s.amount || 0), 0);
-
-    const cashSubmitted = Math.max(txCashSubmitted, localCashSubmitted);
+    const cashSubmitted = Math.max(stateCashSubmitted, txCashSubmitted);
     const netCashDue = Math.max(0, cashCollected - totalBata - reimbursableExpenses - cashSubmitted);
 
     return {
@@ -2515,6 +3036,7 @@ export const AppProvider = ({ children }) => {
     closeAuthModal,
     loginUser,
     registerUser,
+    loginWithGoogle,
     quickDemoLogin,
     quickDriverLogin,
     logoutUser,
@@ -2591,6 +3113,15 @@ export const AppProvider = ({ children }) => {
     getDocumentAlerts,
     recordTransaction,
     saveBooking,
+    deleteBooking,
+    editingBooking,
+    setEditingBooking,
+    openEditBooking,
+    invoices,
+    setInvoices,
+    saveCorporateInvoice,
+    driverSubmissions,
+    setDriverSubmissions,
     startTrip,
     completeTripAndSettle,
     updateBookingStatus,
@@ -2652,7 +3183,11 @@ export const AppProvider = ({ children }) => {
     isCloudConnected,
     cloudSyncStatus,
     lastSyncedAt,
-    syncWithCloud
+    syncWithCloud,
+    isProjectPaused,
+    isCheckingProjectHealth,
+    projectPausedReason,
+    checkProjectStatus
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

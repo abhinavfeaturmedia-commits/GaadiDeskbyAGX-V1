@@ -35,9 +35,12 @@ export const TripSettlementModal = ({ booking, onClose }) => {
 
   const [startKm, setStartKm] = useState(booking.startKm || currentOdometer);
   const [endKm, setEndKm] = useState(booking.startKm ? booking.startKm + estimatedKm : currentOdometer + estimatedKm);
-  const [tollParking, setTollParking] = useState(booking.tollParking || 350);
-  const [driverBata, setDriverBata] = useState(booking.driverBata || 400);
-  const [discount, setDiscount] = useState(0);
+  const [tollParking, setTollParking] = useState(booking.tollParking || 0);
+  const [driverBata, setDriverBata] = useState(booking.driverBata || 0);
+  const [nightHalt, setNightHalt] = useState(booking.nightHalt || 0);
+  const [extraHours, setExtraHours] = useState(booking.extraHours || 0);
+  const [extraHourRate, setExtraHourRate] = useState(booking.extraHourRate || 150);
+  const [discount, setDiscount] = useState(booking.discount || 0);
   const [paymentMode, setPaymentMode] = useState('Cash'); // 'Cash' | 'UPI' | 'Bank' | 'Credit'
   const [notes, setNotes] = useState('');
   const [customerSignature, setCustomerSignature] = useState(booking.customerSignature || null);
@@ -47,10 +50,11 @@ export const TripSettlementModal = ({ booking, onClose }) => {
   const actualKm = Math.max(0, Number(endKm) - Number(startKm));
   const extraKm = Math.max(0, actualKm - estimatedKm);
   const extraKmCharges = extraKm * ratePerKm;
+  const extraHoursCharges = Math.max(0, Number(extraHours)) * Number(extraHourRate);
 
-  // Base fare + Extras
+  // Base fare + Extras (Zero double-counting formula with night halt & extra hours included)
   const baseFare = Number(booking.baseFare || 0);
-  const taxableAmount = baseFare + extraKmCharges + Number(driverBata) - Number(discount);
+  const taxableAmount = Math.max(0, baseFare + extraKmCharges + extraHoursCharges + Number(driverBata) + Number(nightHalt) - Number(discount));
   const gstAmount = booking.gstEnabled ? Math.round(taxableAmount * ((booking.gstPercent || 5) / 100)) : 0;
   const grossTotal = taxableAmount + gstAmount + Number(tollParking);
   
@@ -71,8 +75,11 @@ export const TripSettlementModal = ({ booking, onClose }) => {
       endKm: Number(endKm),
       actualKm,
       extraKmCharges,
+      extraHours: Number(extraHours),
+      extraHoursCharges,
       tollParking: Number(tollParking),
       driverBata: Number(driverBata),
+      nightHalt: Number(nightHalt),
       discount: Number(discount),
       finalPaidAmount: Number(collectedNow),
       settlementPaymentMode: paymentMode,
@@ -182,10 +189,10 @@ export const TripSettlementModal = ({ booking, onClose }) => {
             </div>
           </div>
 
-          {/* Extras & Toll Adjustments */}
+          {/* Extras, Night Halt & Toll Adjustments */}
           <div className="bg-white rounded-3xl p-4 border border-[#E5DFD3] shadow-xs space-y-3">
             <h4 className="text-xs font-black text-[#111827] uppercase tracking-wider">
-              Toll, Parking & Adjustments
+              Tolls, Halts & Overtime
             </h4>
 
             <div className="grid grid-cols-2 gap-2.5">
@@ -209,6 +216,32 @@ export const TripSettlementModal = ({ booking, onClose }) => {
                   type="number"
                   value={driverBata}
                   onChange={e => setDriverBata(Number(e.target.value))}
+                  className="w-full bg-[#F8F6F0] border border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-[#4B5563] block mb-1">
+                  Night Halt Charges (₹)
+                </label>
+                <input
+                  type="number"
+                  value={nightHalt}
+                  onChange={e => setNightHalt(Number(e.target.value))}
+                  placeholder="0"
+                  className="w-full bg-[#F8F6F0] border border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-[#4B5563] block mb-1">
+                  Extra Hours (Overtime)
+                </label>
+                <input
+                  type="number"
+                  value={extraHours}
+                  onChange={e => setExtraHours(Number(e.target.value))}
+                  placeholder="0"
                   className="w-full bg-[#F8F6F0] border border-[#E5DFD3] rounded-xl px-3 py-2 text-xs font-bold text-[#111827] focus:outline-none"
                 />
               </div>
@@ -289,10 +322,34 @@ export const TripSettlementModal = ({ booking, onClose }) => {
                   <span className="font-bold text-amber-700">+{formatCurrency(extraKmCharges)}</span>
                 </div>
               )}
+              {extraHoursCharges > 0 && (
+                <div className="flex justify-between text-[#4B5563] font-semibold">
+                  <span>Extra Hours ({extraHours} hrs × ₹{extraHourRate}):</span>
+                  <span className="font-bold text-amber-700">+{formatCurrency(extraHoursCharges)}</span>
+                </div>
+              )}
+              {Number(driverBata) > 0 && (
+                <div className="flex justify-between text-[#4B5563] font-semibold">
+                  <span>Driver Bata / Allowance:</span>
+                  <span className="font-bold text-[#111827]">+{formatCurrency(driverBata)}</span>
+                </div>
+              )}
+              {Number(nightHalt) > 0 && (
+                <div className="flex justify-between text-[#4B5563] font-semibold">
+                  <span>Night Halt Charges:</span>
+                  <span className="font-bold text-purple-700">+{formatCurrency(nightHalt)}</span>
+                </div>
+              )}
               {tollParking > 0 && (
                 <div className="flex justify-between text-[#4B5563] font-semibold">
                   <span>Toll & Parking:</span>
                   <span className="font-bold text-[#111827]">+{formatCurrency(tollParking)}</span>
+                </div>
+              )}
+              {gstAmount > 0 && (
+                <div className="flex justify-between text-[#4B5563] font-semibold">
+                  <span>GST ({booking.gstPercent || 5}%):</span>
+                  <span className="font-bold text-[#111827]">+{formatCurrency(gstAmount)}</span>
                 </div>
               )}
               {discount > 0 && (

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { SplashScreen } from './components/splash/SplashScreen';
 import { MobileShell } from './components/layout/MobileShell';
 import { HomeDashboard } from './components/dashboard/HomeDashboard';
@@ -8,27 +9,11 @@ import { FleetManager } from './components/fleet/FleetManager';
 import { MoneyDashboard } from './components/money/MoneyDashboard';
 import { MoreMenu } from './components/more/MoreMenu';
 import { NewBookingWizard } from './components/bookings/NewBookingWizard';
-import { TripSettlementModal } from './components/bookings/TripSettlementModal';
-import { TripDetailModal } from './components/bookings/TripDetailModal';
-import { InvoiceGenerator } from './components/invoices/InvoiceGenerator';
-import { WhatsAppModal } from './components/modals/WhatsAppModal';
-import { NotificationModal } from './components/modals/NotificationModal';
-import { RenewalModal } from './components/modals/RenewalModal';
-import { CustomerSettleModal } from './components/modals/CustomerSettleModal';
-import { MembershipPlans } from './components/membership/MembershipPlans';
 import { LandingPage } from './components/landing/LandingPage';
 import { AuthModal } from './components/auth/AuthModal';
+import { ProjectPausedScreen } from './components/common/ProjectPausedScreen';
 
-// Next-Gen Fleet Feature Modals
-import { QuickQuoteModal } from './components/quotes/QuickQuoteModal';
-import { CorporateInvoiceModal } from './components/corporate/CorporateInvoiceModal';
-import { CAExportModal } from './components/export/CAExportModal';
-import { PublicMiniSiteModal } from './components/publicsite/PublicMiniSiteModal';
-import { VehicleServiceModal } from './components/fleet/VehicleServiceModal';
-import { VehicleDetailModal } from './components/fleet/VehicleDetailModal';
-import { VehicleInspectionModal } from './components/inspection/VehicleInspectionModal';
-
-// Driver Views & Modals
+// Driver Views & Modals (Critical for Driver Workflow)
 import { DriverShell } from './components/driver/DriverShell';
 import { DriverDashboard } from './components/driver/DriverDashboard';
 import { DriverTripHistory } from './components/driver/DriverTripHistory';
@@ -36,6 +21,32 @@ import { DriverCashWallet } from './components/driver/DriverCashWallet';
 import { DriverProfile } from './components/driver/DriverProfile';
 import { DriverTollModal } from './components/driver/DriverTollModal';
 import { DriverUpiModal } from './components/driver/DriverUpiModal';
+
+// Code-Split Lazy-Loaded Modals for Instant App Launch
+const TripSettlementModal = lazy(() => import('./components/bookings/TripSettlementModal').then(m => ({ default: m.TripSettlementModal })));
+const TripDetailModal = lazy(() => import('./components/bookings/TripDetailModal').then(m => ({ default: m.TripDetailModal })));
+const InvoiceGenerator = lazy(() => import('./components/invoices/InvoiceGenerator').then(m => ({ default: m.InvoiceGenerator })));
+const WhatsAppModal = lazy(() => import('./components/modals/WhatsAppModal').then(m => ({ default: m.WhatsAppModal })));
+const NotificationModal = lazy(() => import('./components/modals/NotificationModal').then(m => ({ default: m.NotificationModal })));
+const RenewalModal = lazy(() => import('./components/modals/RenewalModal').then(m => ({ default: m.RenewalModal })));
+const CustomerSettleModal = lazy(() => import('./components/modals/CustomerSettleModal').then(m => ({ default: m.CustomerSettleModal })));
+const MembershipPlans = lazy(() => import('./components/membership/MembershipPlans').then(m => ({ default: m.MembershipPlans })));
+const QuickQuoteModal = lazy(() => import('./components/quotes/QuickQuoteModal').then(m => ({ default: m.QuickQuoteModal })));
+const CorporateInvoiceModal = lazy(() => import('./components/corporate/CorporateInvoiceModal').then(m => ({ default: m.CorporateInvoiceModal })));
+const CAExportModal = lazy(() => import('./components/export/CAExportModal').then(m => ({ default: m.CAExportModal })));
+const PublicMiniSiteModal = lazy(() => import('./components/publicsite/PublicMiniSiteModal').then(m => ({ default: m.PublicMiniSiteModal })));
+const VehicleServiceModal = lazy(() => import('./components/fleet/VehicleServiceModal').then(m => ({ default: m.VehicleServiceModal })));
+const VehicleDetailModal = lazy(() => import('./components/fleet/VehicleDetailModal').then(m => ({ default: m.VehicleDetailModal })));
+const VehicleInspectionModal = lazy(() => import('./components/inspection/VehicleInspectionModal').then(m => ({ default: m.VehicleInspectionModal })));
+
+const ModalLoadingFallback = () => (
+  <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 animate-fade-in">
+    <div className="bg-white p-4 rounded-3xl shadow-xl flex items-center gap-3 border border-[#E5DFD3]">
+      <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs font-black text-[#111827]">Loading...</span>
+    </div>
+  </div>
+);
 
 const MainContent = () => {
   const [showSplash, setShowSplash] = useState(true);
@@ -71,8 +82,22 @@ const MainContent = () => {
     setSelectedVehicleDetail,
     inspectionModalBooking,
     setInspectionModalBooking,
-    saveVehicleInspection
+    saveVehicleInspection,
+    isProjectPaused,
+    projectPausedReason,
+    checkProjectStatus
   } = useApp();
+
+  // If Supabase project is paused, LOCK DOWN the entire application immediately!
+  // No Landing page, no login, no register, no dashboard, no driver views.
+  if (isProjectPaused) {
+    return (
+      <ProjectPausedScreen
+        onRetry={checkProjectStatus}
+        errorReason={projectPausedReason}
+      />
+    );
+  }
 
   return (
     <>
@@ -86,7 +111,9 @@ const MainContent = () => {
           <LandingPage />
           <AuthModal />
           {isMembershipOpen && (
-            <MembershipPlans onClose={() => setIsMembershipOpen(false)} />
+            <Suspense fallback={<ModalLoadingFallback />}>
+              <MembershipPlans onClose={() => setIsMembershipOpen(false)} />
+            </Suspense>
           )}
         </>
       ) : authUser.role === 'driver' ? (
@@ -103,9 +130,11 @@ const MainContent = () => {
 
           {/* Driver Notifications */}
           {isNotificationsOpen && (
-            <NotificationModal
-              onClose={() => setIsNotificationsOpen(false)}
-            />
+            <Suspense fallback={<ModalLoadingFallback />}>
+              <NotificationModal
+                onClose={() => setIsNotificationsOpen(false)}
+              />
+            </Suspense>
           )}
         </DriverShell>
       ) : (
@@ -123,99 +152,101 @@ const MainContent = () => {
             <NewBookingWizard onClose={() => setIsNewBookingOpen(false)} />
           )}
 
-          {selectedTripDetailBooking && (
-            <TripDetailModal
-              booking={selectedTripDetailBooking}
-              onClose={() => setSelectedTripDetailBooking(null)}
-            />
-          )}
+          <Suspense fallback={<ModalLoadingFallback />}>
+            {selectedTripDetailBooking && (
+              <TripDetailModal
+                booking={selectedTripDetailBooking}
+                onClose={() => setSelectedTripDetailBooking(null)}
+              />
+            )}
 
-          {settlementBooking && (
-            <TripSettlementModal
-              booking={settlementBooking}
-              onClose={() => setSettlementBooking(null)}
-            />
-          )}
+            {settlementBooking && (
+              <TripSettlementModal
+                booking={settlementBooking}
+                onClose={() => setSettlementBooking(null)}
+              />
+            )}
 
-          {selectedInvoiceBooking && (
-            <InvoiceGenerator
-              booking={selectedInvoiceBooking}
-              onClose={() => setSelectedInvoiceBooking(null)}
-            />
-          )}
+            {selectedInvoiceBooking && (
+              <InvoiceGenerator
+                booking={selectedInvoiceBooking}
+                onClose={() => setSelectedInvoiceBooking(null)}
+              />
+            )}
 
-          {whatsAppData && (
-            <WhatsAppModal
-              data={whatsAppData}
-              onClose={() => setWhatsAppData(null)}
-            />
-          )}
+            {whatsAppData && (
+              <WhatsAppModal
+                data={whatsAppData}
+                onClose={() => setWhatsAppData(null)}
+              />
+            )}
 
-          {isNotificationsOpen && (
-            <NotificationModal
-              onClose={() => setIsNotificationsOpen(false)}
-            />
-          )}
+            {isNotificationsOpen && (
+              <NotificationModal
+                onClose={() => setIsNotificationsOpen(false)}
+              />
+            )}
 
-          {isMembershipOpen && (
-            <MembershipPlans
-              onClose={() => setIsMembershipOpen(false)}
-            />
-          )}
+            {isMembershipOpen && (
+              <MembershipPlans
+                onClose={() => setIsMembershipOpen(false)}
+              />
+            )}
 
-          {/* RTO Document Renewal Modal */}
-          <RenewalModal />
+            {/* RTO Document Renewal Modal */}
+            <RenewalModal />
 
-          {/* Customer Dues Settlement Modal */}
-          <CustomerSettleModal />
+            {/* Customer Dues Settlement Modal */}
+            <CustomerSettleModal />
 
-          {/* 10-Second Instant Quotation Modal */}
-          {isQuickQuoteOpen && (
-            <QuickQuoteModal onClose={() => setIsQuickQuoteOpen(false)} />
-          )}
+            {/* 10-Second Instant Quotation Modal */}
+            {isQuickQuoteOpen && (
+              <QuickQuoteModal onClose={() => setIsQuickQuoteOpen(false)} />
+            )}
 
-          {/* Corporate B2B Monthly Invoicing Modal */}
-          {selectedCorporateCustomer && (
-            <CorporateInvoiceModal
-              customer={selectedCorporateCustomer}
-              onClose={() => setSelectedCorporateCustomer(null)}
-            />
-          )}
+            {/* Corporate B2B Monthly Invoicing Modal */}
+            {selectedCorporateCustomer && (
+              <CorporateInvoiceModal
+                customer={selectedCorporateCustomer}
+                onClose={() => setSelectedCorporateCustomer(null)}
+              />
+            )}
 
-          {/* CA & Tally Export Modal */}
-          {isCaExportOpen && (
-            <CAExportModal onClose={() => setIsCaExportOpen(false)} />
-          )}
+            {/* CA & Tally Export Modal */}
+            {isCaExportOpen && (
+              <CAExportModal onClose={() => setIsCaExportOpen(false)} />
+            )}
 
-          {/* Operator Branded Public Mini-Website Modal */}
-          {isPublicSiteOpen && (
-            <PublicMiniSiteModal onClose={() => setIsPublicSiteOpen(false)} />
-          )}
+            {/* Operator Branded Public Mini-Website Modal */}
+            {isPublicSiteOpen && (
+              <PublicMiniSiteModal onClose={() => setIsPublicSiteOpen(false)} />
+            )}
 
-          {/* Odometer Vehicle Maintenance & Service Modal */}
-          {serviceModalVehicle && (
-            <VehicleServiceModal
-              vehicle={serviceModalVehicle}
-              onClose={() => setServiceModalVehicle(null)}
-            />
-          )}
+            {/* Odometer Vehicle Maintenance & Service Modal */}
+            {serviceModalVehicle && (
+              <VehicleServiceModal
+                vehicle={serviceModalVehicle}
+                onClose={() => setServiceModalVehicle(null)}
+              />
+            )}
 
-          {/* 360° Vehicle Passport & Detail Modal */}
-          {selectedVehicleDetail && (
-            <VehicleDetailModal
-              vehicle={selectedVehicleDetail}
-              onClose={() => setSelectedVehicleDetail(null)}
-            />
-          )}
+            {/* 360° Vehicle Passport & Detail Modal */}
+            {selectedVehicleDetail && (
+              <VehicleDetailModal
+                vehicle={selectedVehicleDetail}
+                onClose={() => setSelectedVehicleDetail(null)}
+              />
+            )}
 
-          {/* 6-Point Vehicle Rental Inspection Modal */}
-          {inspectionModalBooking && (
-            <VehicleInspectionModal
-              booking={inspectionModalBooking}
-              onSave={(data) => saveVehicleInspection(inspectionModalBooking.id, data)}
-              onClose={() => setInspectionModalBooking(null)}
-            />
-          )}
+            {/* 6-Point Vehicle Rental Inspection Modal */}
+            {inspectionModalBooking && (
+              <VehicleInspectionModal
+                booking={inspectionModalBooking}
+                onSave={(data) => saveVehicleInspection(inspectionModalBooking.id, data)}
+                onClose={() => setInspectionModalBooking(null)}
+              />
+            )}
+          </Suspense>
 
           {/* Global Auth Modal */}
           <AuthModal />
@@ -227,9 +258,11 @@ const MainContent = () => {
 
 export function App() {
   return (
-    <AppProvider>
-      <MainContent />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <MainContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
 

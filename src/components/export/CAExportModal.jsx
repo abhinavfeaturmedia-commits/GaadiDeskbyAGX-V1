@@ -38,11 +38,17 @@ export const CAExportModal = ({ onClose }) => {
       "Payment Mode"
     ];
 
-    const rows = bookings.map(b => {
+    const billableBookings = bookings.filter(b => b.status !== 'Cancelled' && b.status !== 'Enquiry');
+
+    const rows = billableBookings.map(b => {
       const isGst = b.gstEnabled !== false;
-      const taxable = b.taxableAmount || Math.round(b.totalFare / 1.05);
-      const cgst = isGst ? Math.round(taxable * 0.025) : 0;
-      const sgst = isGst ? Math.round(taxable * 0.025) : 0;
+      const rate = Number(b.gstPercent || 5);
+      const halfRate = (rate / 2) / 100;
+      const taxable = b.taxableAmount !== undefined && b.taxableAmount !== null
+        ? Number(b.taxableAmount)
+        : Math.round((Number(b.totalFare || 0) - Number(b.tollParking || 0)) / (1 + rate / 100));
+      const cgst = isGst ? Math.round(taxable * halfRate) : 0;
+      const sgst = isGst ? Math.round(taxable * halfRate) : 0;
       const toll = Number(b.tollParking || 0);
       const total = b.totalFare;
       const date = (b.startDateTime || b.createdAt || '').slice(0, 10);

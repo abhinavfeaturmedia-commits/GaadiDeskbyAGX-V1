@@ -36,14 +36,34 @@ export const BookingsList = () => {
     formatCurrency
   } = useApp();
 
+  const [dateFilter, setDateFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [startTripModal, setStartTripModal] = useState(null);
   const [startKmInput, setStartKmInput] = useState('');
 
+  const dateFilters = ['Today', 'Tomorrow', 'This Week', 'Upcoming', 'All'];
   const statuses = ['All', 'Ongoing', 'Driver Assigned', 'Confirmed', 'Completed', 'Cancelled'];
 
   const filteredBookings = bookings.filter(b => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const nextWeekTime = Date.now() + 7 * 86400000;
+    const bDate = (b.startDateTime || '').split('T')[0];
+
+    let matchesDate = true;
+    if (dateFilter === 'Today') {
+      matchesDate = bDate === todayStr || b.status === 'Ongoing';
+    } else if (dateFilter === 'Tomorrow') {
+      matchesDate = bDate === tomorrowStr;
+    } else if (dateFilter === 'This Week') {
+      const bTime = new Date(b.startDateTime).getTime();
+      matchesDate = bTime >= Date.now() - 86400000 && bTime <= nextWeekTime;
+    } else if (dateFilter === 'Upcoming') {
+      const bTime = new Date(b.startDateTime).getTime();
+      matchesDate = bTime >= Date.now() || b.status === 'Ongoing';
+    }
+
     const matchesStatus = statusFilter === 'All' || b.status === statusFilter;
     const matchesSearch =
       b.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -51,7 +71,7 @@ export const BookingsList = () => {
       b.dropLocation?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.vehiclePlate?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.id?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesStatus && matchesSearch;
+    return matchesDate && matchesStatus && matchesSearch;
   });
 
   const handleStartConfirm = () => {
@@ -65,9 +85,11 @@ export const BookingsList = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-black text-[#111827]">{t('tileTodayTrips')}</h2>
+          <h2 className="text-xl font-black text-[#111827]">
+            {dateFilter === 'Today' ? t('tileTodayTrips') : `${dateFilter} Trips`}
+          </h2>
           <p className="text-xs text-[#4B5563] font-semibold">
-            {bookings.length} total bookings recorded
+            {filteredBookings.length} bookings found ({bookings.length} total recorded)
           </p>
         </div>
         <button
@@ -89,6 +111,26 @@ export const BookingsList = () => {
           onChange={e => setSearchQuery(e.target.value)}
           className="w-full bg-white border-2 border-[#E5DFD3] rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold text-[#111827] focus:outline-none focus:border-[#111827] shadow-xs"
         />
+      </div>
+
+      {/* Date Filter Pills */}
+      <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar py-0.5">
+        {dateFilters.map(df => {
+          const isActive = dateFilter === df;
+          return (
+            <button
+              key={df}
+              onClick={() => setDateFilter(df)}
+              className={`px-3 py-1 rounded-xl text-xs font-black whitespace-nowrap transition-all tap-active ${
+                isActive
+                  ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-xs'
+                  : 'bg-white border border-[#E5DFD3] text-[#4B5563] hover:bg-gray-50'
+              }`}
+            >
+              {df}
+            </button>
+          );
+        })}
       </div>
 
       {/* Status Filter Pills */}

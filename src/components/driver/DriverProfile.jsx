@@ -123,7 +123,7 @@ export const DriverProfile = () => {
           </div>
           <div className="pt-1 border-t border-[#E5DFD3]">
             <span className="text-[10px] text-[#4B5563] font-bold block">Fleet Owner / Office Manager</span>
-            <span className="font-black text-[#111827]">{business.ownerName || 'Ramesh Gaikwad'} ({business.phone || '+91 98220 12345'})</span>
+            <span className="font-black text-[#111827]">{business.ownerName || business.name || 'Fleet Office'} {business.phone ? `(${business.phone})` : ''}</span>
           </div>
         </div>
       </div>
